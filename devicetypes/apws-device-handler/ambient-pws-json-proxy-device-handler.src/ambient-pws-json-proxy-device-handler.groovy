@@ -1,10 +1,10 @@
 /**
- *  PWS JSON Proxy Device Handler
+ *  Ambient PWS JSON Proxy Device Handler
  *
  *  This device handler is for the Ambient Weather Station and depends on a JSON proxy to scrape the weather station
  *  "livedata" (livedata.htm) page. This script is available at https://gist.github.com/voodoojello.
- *
- *  Copyright 2017 MARK PAGE
+ * 
+ *  Copyright (c)2017 Mark Page (mark@very3.net)
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -25,9 +25,9 @@ metadata {
     description: "Virtual device handler for Ambient PWS JSON proxy",
     singleInstance: true,
     category: "SmartThings Internal",
-    iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings-apps/master/very3-256px.png",
-    iconX2Url: "https://raw.githubusercontent.com/voodoojello/smartthings-apps/master/very3-512px.png",
-    iconX3Url: "https://raw.githubusercontent.com/voodoojello/smartthings-apps/master/very3-512px.png"
+    iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-256px.png",
+    iconX2Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png",
+    iconX3Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png"
   ) {
       capability "Illuminance Measurement"
       capability "Relative Humidity Measurement"
