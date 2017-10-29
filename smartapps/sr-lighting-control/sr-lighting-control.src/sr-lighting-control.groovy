@@ -4,6 +4,7 @@
  *  PWS JSON Proxy - SR Lighting Control
  * ============================================
  *
+ *  Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS JSON proxy
  *  Copyright (c)2017 Mark Page (mark@very3.net)
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
