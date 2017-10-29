@@ -1,4 +1,4 @@
 # smartthings
-SmartThings Apps and Virtual Devices
+Very3 - SmartThings Apps and Virtual Devices
 
 A collection of simple SmartThings apps and device handlers
