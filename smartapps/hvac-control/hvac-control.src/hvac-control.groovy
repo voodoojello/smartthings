@@ -25,7 +25,7 @@ definition (
   namespace: "hvac-control",
   author: "Mark Page",
   description: "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. (17.10.29.1a)",
-  singleInstance: false,
+  singleInstance: true,
   category: "SmartThings Internal",
   iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-256px.png",
   iconX2Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png",
@@ -47,6 +47,10 @@ def mainPage() {
       input "thermostats", "capability.thermostat", title: "Select thermostats:", multiple: true, required: true
     }
 
+    section ("Select virtual hold switch to override auto set...") {
+      input "thermHoldSwitch", "capability.switch", required: true, title: "Choose the HVAC virtual hold switch:"
+    }
+
     section ("Set default away mode temperatures...") {
 	  input "awayCoolTemp", "number", title: "Default away cooling temperature:", multiple: false, required: true
 	  input "awayHeatTemp", "number", title: "Default away heating temperature:", multiple: false, required: true
@@ -66,12 +70,8 @@ def updated() {
 }
 
 def initialize() {
-  state.isLowSet = false
-  state.isHighSet = false
-  state.lastRun = 'never'
-
   mainRouter()
-  runEvery1Hour(mainRouter)
+  runEvery30Minutes(mainRouter)
 }
 
 def mainRouter() {
@@ -91,36 +91,41 @@ def mainRouter() {
   	adj_temp = awayCoolTemp
   }
 
-  if (hvac_mode == "cool") {
+  if (hvac_mode == "cool" && thermHoldSwitch.currentSwitch == 'off') {
     thermostats.cool()
     thermostats.fanAuto()
     thermostats.setCoolingSetpoint(adj_temp)
   }
 
-  if (hvac_mode == "heat") {
+  if (hvac_mode == "heat" && thermHoldSwitch.currentSwitch == 'off') {
     thermostats.heat()
     thermostats.fanAuto()
     thermostats.setHeatingSetpoint(adj_temp)
   }
-  
-  
-  def thermostatStates = thermostats.findAll { thermostatsVal ->
-    log.debug "HVACC: ${thermostatsVal.coolingSetpoint}"
-  }
-  
-  log.info "HVACC coolingSetpoint: ${thermostats.coolingSetpoint}"
-  log.info "HVACC heatingSetpoint: ${thermostats.heatingSetpoint}"
-  log.info "HVACC thermostatFanMode: ${thermostats.thermostatFanMode}"
 
+  if (thermHoldSwitch.currentSwitch == 'on') {
+    sendNotificationEvent("HVACC: thermHoldSwitch is ON, no action taken.")
+  }
+  else {
+    sendNotificationEvent("HVACC: Set mode to ${hvac_mode}, set temperature to ${pwsData.hvac.set_temp} (${adj_temp} adjusted). Outside temperature reported as ${pwsData.pws.outtemp} degrees.")
+  }
+
+  log.info "HVACC latestTempValue [0]: ${thermostats[0].latestValue("temperature")}"
+  log.info "HVACC latestModeValue [0]: ${thermostats[0].latestValue("thermostatMode")}"
+  log.info "HVACC latestCoolSetPointValue [0]: ${thermostats[0].latestValue("coolingSetpoint")}"
+
+  log.info "HVACC latestTempValue [1]: ${thermostats[1].latestValue("temperature")}"
+  log.info "HVACC latestModeValue [1]: ${thermostats[1].latestValue("thermostatMode")}"
+  log.info "HVACC latestHeatSetPointValue [1]: ${thermostats[1].latestValue("heatingSetpoint")}"
+
+  log.info "HVACC thermHoldSwitchState: ${thermHoldSwitch.currentSwitch}"
   log.info "HVACC set_temp: ${set_temp}"
-  
   log.info "HVACC PWS outtemp: ${pwsData.pws.outtemp}"
+  log.info "HVACC PWS apptemp: ${pwsData.pws.apptemp}"
   log.info "HVACC PWS set_temp: ${pwsData.hvac.set_temp}"
   log.info "HVACC PWS adj_temp: ${pwsData.hvac.adj_temp}"
   log.info "HVACC PWS diff_temp: ${pwsData.hvac.diff_temp}"
   log.info "HVACC PWS hvac_mode: ${pwsData.hvac.hvac_mode}"
-
-  sendNotificationEvent("HVACC: Set mode to ${hvac_mode}, set temperature to ${pwsData.hvac.set_temp} (${adj_temp} adjusted.)")
 }
 
 def fetchJSON(pwsURI) {
