@@ -24,9 +24,9 @@ definition (
   description: "Daily run times and intervals for automatic cat feeder. Allows for two feedings per day.",
   singleInstance: true,
   category: "SmartThings Internal",
-  iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings-apps/master/very3-256px.png",
-  iconX2Url: "https://raw.githubusercontent.com/voodoojello/smartthings-apps/master/very3-512px.png",
-  iconX3Url: "https://raw.githubusercontent.com/voodoojello/smartthings-apps/master/very3-512px.png"
+  iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-256px.png",
+  iconX2Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png",
+  iconX3Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png"
 )
 
 preferences {

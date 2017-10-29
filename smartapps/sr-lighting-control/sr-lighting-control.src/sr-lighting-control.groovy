@@ -26,9 +26,9 @@ definition (
   description: "Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS JSON proxy. (17.10.29.1a)",
   singleInstance: false,
   category: "SmartThings Internal",
-  iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings-apps/master/very3-256px.png",
-  iconX2Url: "https://raw.githubusercontent.com/voodoojello/smartthings-apps/master/very3-512px.png",
-  iconX3Url: "https://raw.githubusercontent.com/voodoojello/smartthings-apps/master/very3-512px.png"
+  iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-256px.png",
+  iconX2Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png",
+  iconX3Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png"
 )
 
 preferences {
