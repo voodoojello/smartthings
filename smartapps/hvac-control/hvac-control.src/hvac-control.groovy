@@ -21,10 +21,10 @@
 
 definition (
   name: "HVAC Control",
-  version: "17.10.29.1a",
+  version: "17.11.03.1a",
   namespace: "hvac-control",
   author: "Mark Page",
-  description: "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. (17.10.29.1a)",
+  description: "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. (17.11.03.1a)",
   singleInstance: true,
   category: "SmartThings Internal",
   iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-256px.png",
@@ -76,18 +76,18 @@ def initialize() {
 
 def mainRouter() {
   log.info "HVACC: Starting..."
-  def pwsData = fetchJSON("http://pws.very3.net")
+  def pwsData = fetchJSON("https://pws.very3.net")
   
   def set_temp  = pwsData.hvac.set_temp
   def adj_temp  = pwsData.hvac.adj_temp
   def hvac_mode = pwsData.hvac.hvac_mode
   def currMode  = location.mode
   
-  if (currMode == "away" && hvac_mode == "heat") {
+  if (currMode.toLowerCase() == "away" && hvac_mode == "heat") {
   	adj_temp = awayHeatTemp
   }
 
-  if (currMode == "away" && hvac_mode == "cool") {
+  if (currMode.toLowerCase() == "away" && hvac_mode == "cool") {
   	adj_temp = awayCoolTemp
   }
 
@@ -107,20 +107,21 @@ def mainRouter() {
     sendNotificationEvent("HVACC: thermHoldSwitch is ON, no action taken.")
   }
   else {
-    sendNotificationEvent("HVACC: Set mode to ${hvac_mode}, set temperature to ${pwsData.hvac.set_temp} (${adj_temp} adjusted). Outside temperature reported as ${pwsData.pws.outtemp} degrees.")
+    sendNotificationEvent("HVACC: Set mode to ${hvac_mode}, set temperature to ${pwsData.hvac.set_temp} (${adj_temp} adjusted, ${currMode} mode). OS Temperature: ${pwsData.pws.outtemp}°. OS Humidity: ${pwsData.pws.outhumi}%.")
   }
 
-  log.info "HVACC latestTempValue [0]: ${thermostats[0].latestValue("temperature")}"
-  log.info "HVACC latestModeValue [0]: ${thermostats[0].latestValue("thermostatMode")}"
-  log.info "HVACC latestCoolSetPointValue [0]: ${thermostats[0].latestValue("coolingSetpoint")}"
+  log.trace "HVACC latestTempValue [0]: ${thermostats[0].latestValue("temperature")}"
+  log.trace "HVACC latestModeValue [0]: ${thermostats[0].latestValue("thermostatMode")}"
+  log.trace "HVACC latestCoolSetPointValue [0]: ${thermostats[0].latestValue("coolingSetpoint")}"
 
-  log.info "HVACC latestTempValue [1]: ${thermostats[1].latestValue("temperature")}"
-  log.info "HVACC latestModeValue [1]: ${thermostats[1].latestValue("thermostatMode")}"
-  log.info "HVACC latestHeatSetPointValue [1]: ${thermostats[1].latestValue("heatingSetpoint")}"
+  log.trace "HVACC latestTempValue [1]: ${thermostats[1].latestValue("temperature")}"
+  log.trace "HVACC latestModeValue [1]: ${thermostats[1].latestValue("thermostatMode")}"
+  log.trace "HVACC latestHeatSetPointValue [1]: ${thermostats[1].latestValue("heatingSetpoint")}"
 
   log.info "HVACC thermHoldSwitchState: ${thermHoldSwitch.currentSwitch}"
   log.info "HVACC set_temp: ${set_temp}"
   log.info "HVACC PWS outtemp: ${pwsData.pws.outtemp}"
+  log.info "HVACC PWS outhumi: ${pwsData.pws.outhumi}"
   log.info "HVACC PWS apptemp: ${pwsData.pws.apptemp}"
   log.info "HVACC PWS set_temp: ${pwsData.hvac.set_temp}"
   log.info "HVACC PWS adj_temp: ${pwsData.hvac.adj_temp}"
