@@ -65,7 +65,7 @@ def initialize() {
 }
 
 def mainRouter() {
-  def pwsData = fetchJSON("http://pws.very3.net")
+  def pwsData = fetchJSON("https://pws.very3.net")
   log.trace "PWS Data: ${pwsData.pws}"
 
   // Pump Switch

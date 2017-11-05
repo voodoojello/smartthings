@@ -92,7 +92,7 @@ def initialize() {
 
 def mainRouter() {
   log.info "SRLC: Starting..."
-  def pwsData = fetchJSON("http://pws.very3.net")
+  def pwsData = fetchJSON("https://pws.very3.net")
 
   def tz = location.timeZone
   def dontStartLowTime = timeToday(dontRunLowBefore,tz)
