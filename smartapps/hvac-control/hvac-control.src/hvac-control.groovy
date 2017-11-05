@@ -21,10 +21,10 @@
 
 definition (
   name: "HVAC Control",
-  version: "17.11.05.01",
+  version: "17.11.05.02",
   namespace: "hvac-control",
   author: "Mark Page",
-  description: "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. (17.11.05.01)",
+  description: "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. (17.11.05.02)",
   singleInstance: true,
   category: "SmartThings Internal",
   iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-256px.png",
@@ -40,7 +40,7 @@ def mainPage() {
   dynamicPage(name: "mainPage", title: "") {
 
     section ("HVAC Control") {
-      paragraph "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. Polls in 1 hour intervals. (v17.11.05.01)"
+      paragraph "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. Polls in 30 minute intervals. (v17.11.05.02)"
     }
 
     section ("Select Thermostats") {
@@ -139,13 +139,13 @@ def mainRouter() {
     sendNotificationEvent("HVACC: Set HVAC mode to ${hvac_mode}, set temperature to ${pwsData.hvac.set_temp} (${adj_temp} adjusted, ${currMode} mode, Night ${pwsData.hvac.nightmode}). OS Temperature: ${pwsData.pws.outtemp}°. OS Humidity: ${pwsData.pws.outhumi}%.")
   }
 
-  log.trace "HVACC latestTempValue [0]: ${thermostats[0].latestValue("temperature")}"
-  log.trace "HVACC latestModeValue [0]: ${thermostats[0].latestValue("thermostatMode")}"
-  log.trace "HVACC latestCoolSetPointValue [0]: ${thermostats[0].latestValue("coolingSetpoint")}"
+  log.trace "HVACC [${thermostats[0].label}] latestTempValue: ${thermostats[0].latestValue("temperature")}"
+  log.trace "HVACC [${thermostats[0].label}] latestModeValue: ${thermostats[0].latestValue("thermostatMode")}"
+  log.trace "HVACC [${thermostats[0].label}] latestCoolingSetPoint: ${thermostats[0].latestValue("coolingSetpoint")}"
 
-  log.trace "HVACC latestTempValue [1]: ${thermostats[1].latestValue("temperature")}"
-  log.trace "HVACC latestModeValue [1]: ${thermostats[1].latestValue("thermostatMode")}"
-  log.trace "HVACC latestHeatSetPointValue [1]: ${thermostats[1].latestValue("heatingSetpoint")}"
+  log.trace "HVACC [${thermostats[1].label}] latestTempValue: ${thermostats[1].latestValue("temperature")}"
+  log.trace "HVACC [${thermostats[1].label}] latestModeValue: ${thermostats[1].latestValue("thermostatMode")}"
+  log.trace "HVACC [${thermostats[1].label}] latestHeatingSetPoint: ${thermostats[1].latestValue("heatingSetpoint")}"
 
   log.info "HVACC thermHoldSwitchState: ${thermHoldSwitch.currentSwitch}"
   log.info "HVACC set_temp: ${set_temp}"
