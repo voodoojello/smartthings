@@ -21,10 +21,10 @@
 
 definition (
   name: "HVAC Control",
-  version: "17.11.03.1a",
+  version: "17.11.05.01",
   namespace: "hvac-control",
   author: "Mark Page",
-  description: "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. (17.11.03.1a)",
+  description: "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. (17.11.05.01)",
   singleInstance: true,
   category: "SmartThings Internal",
   iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-256px.png",
@@ -40,20 +40,48 @@ def mainPage() {
   dynamicPage(name: "mainPage", title: "") {
 
     section ("HVAC Control") {
-      paragraph "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. Polls in 1 hour intervals."
+      paragraph "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. Polls in 1 hour intervals. (v17.11.05.01)"
     }
 
-    section ("Select thermostats to control...") {
+    section ("Select Thermostats") {
       input "thermostats", "capability.thermostat", title: "Select thermostats:", multiple: true, required: true
     }
 
-    section ("Select virtual hold switch to override auto set...") {
-      input "thermHoldSwitch", "capability.switch", required: true, title: "Choose the HVAC virtual hold switch:"
+    section ("Day/Night Temperature Presets") {
+      input "dayCool", "decimal", title: "Day cooling temperature:", required: true
+      input "nightCool", "decimal", title: "Night cooling temperature:", required: true
+      input "dayHeat", "decimal", title: "Day heating temperature:", required: true
+      input "nightHeat", "decimal", title: "Night heating temperature:", required: true
     }
 
-    section ("Set default away mode temperatures...") {
+    section ("Heating/Cooling Changeover Temperatures") {
+      input "modeThresCool", "decimal", title: "Cooling temperature threshold:", required: true
+      input "modeThresHeat", "decimal", title: "Heating temperature threshold:", required: true
+    }
+
+    section ("Night Start/Stop") {
+      input "nightStart", "time", title: "Night cycle starts at hour:", required: true
+      input "nightStop", "time", title: "Night cycle stops at hour:", required: true
+    }
+
+    section ("Comfort Calculation Tweaks") {
+      paragraph "Safe tweak ranges for temperature are .1 to .5 (default: .3)"
+      input "tweakTemp", "decimal", title: "Tweak temperature:", required: true
+      paragraph "Safe tweak ranges for humidity are .001 to .008 (default: .001)"
+      input "tweakHumi", "decimal", title: "Tweak humidity:", required: true
+    }
+
+    section ("Virtual Hold Switch for Override") {
+      input "thermHoldSwitch", "capability.switch", required: true, title: "Choose the virtual hold switch:"
+    }
+
+    section ("Default Away Mode Temperatures") {
 	  input "awayCoolTemp", "number", title: "Default away cooling temperature:", multiple: false, required: true
 	  input "awayHeatTemp", "number", title: "Default away heating temperature:", multiple: false, required: true
+    }
+
+    section ("Application Authentication Key") {
+      input "appKey", "text", title: "Numbers or text, 8 character minimum:", multiple: false, required: true
     }
   }
 }
@@ -76,7 +104,8 @@ def initialize() {
 
 def mainRouter() {
   log.info "HVACC: Starting..."
-  def pwsData = fetchJSON("https://pws.very3.net")
+  def getUrl  = "https://pws.very3.net/?_k="+appKey+"&_dc="+dayCool+"&_nc="+nightCool+"&_dh="+dayHeat+"&_nh="+nightHeat+"&_ct="+modeThresCool+"&_ht="+modeThresHeat+"&_nb="+nightStart+"+&_ne="+nightStop+"&_tt="+tweakTemp+"&_th="+tweakHumi
+  def pwsData = fetchJSON(getUrl)
   
   def set_temp  = pwsData.hvac.set_temp
   def adj_temp  = pwsData.hvac.adj_temp
@@ -107,7 +136,7 @@ def mainRouter() {
     sendNotificationEvent("HVACC: thermHoldSwitch is ON, no action taken.")
   }
   else {
-    sendNotificationEvent("HVACC: Set mode to ${hvac_mode}, set temperature to ${pwsData.hvac.set_temp} (${adj_temp} adjusted, ${currMode} mode). OS Temperature: ${pwsData.pws.outtemp}°. OS Humidity: ${pwsData.pws.outhumi}%.")
+    sendNotificationEvent("HVACC: Set HVAC mode to ${hvac_mode}, set temperature to ${pwsData.hvac.set_temp} (${adj_temp} adjusted, ${currMode} mode, Night ${pwsData.hvac.nightmode}). OS Temperature: ${pwsData.pws.outtemp}°. OS Humidity: ${pwsData.pws.outhumi}%.")
   }
 
   log.trace "HVACC latestTempValue [0]: ${thermostats[0].latestValue("temperature")}"
@@ -120,12 +149,14 @@ def mainRouter() {
 
   log.info "HVACC thermHoldSwitchState: ${thermHoldSwitch.currentSwitch}"
   log.info "HVACC set_temp: ${set_temp}"
+  log.info "HVACC night_mode: ${pwsData.hvac.nightmode}"
   log.info "HVACC PWS outtemp: ${pwsData.pws.outtemp}"
   log.info "HVACC PWS outhumi: ${pwsData.pws.outhumi}"
   log.info "HVACC PWS apptemp: ${pwsData.pws.apptemp}"
   log.info "HVACC PWS set_temp: ${pwsData.hvac.set_temp}"
   log.info "HVACC PWS adj_temp: ${pwsData.hvac.adj_temp}"
   log.info "HVACC PWS diff_temp: ${pwsData.hvac.diff_temp}"
+  log.info "HVACC PWS apdiff_temp: ${pwsData.hvac.apdiff_temp}"
   log.info "HVACC PWS hvac_mode: ${pwsData.hvac.hvac_mode}"
 }
 
