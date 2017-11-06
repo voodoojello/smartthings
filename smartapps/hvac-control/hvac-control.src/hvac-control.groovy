@@ -54,25 +54,14 @@ def mainPage() {
       input "nightHeat", "decimal", title: "Night heating temperature:", required: true
     }
 
-    section ("Heating/Cooling Changeover Temperatures") {
-      input "modeThresCool", "decimal", title: "Cooling temperature threshold:", required: true
-      input "modeThresHeat", "decimal", title: "Heating temperature threshold:", required: true
-    }
-
     section ("Night Start/Stop") {
       input "nightStart", "time", title: "Night cycle starts at hour:", required: true
       input "nightStop", "time", title: "Night cycle stops at hour:", required: true
     }
 
-    section ("Comfort Calculation Tweaks") {
-      paragraph "Safe tweak ranges for temperature are .1 to .5 (default: .3)"
-      input "tweakTemp", "decimal", title: "Tweak temperature:", required: true
-      paragraph "Safe tweak ranges for humidity are .001 to .008 (default: .001)"
-      input "tweakHumi", "decimal", title: "Tweak humidity:", required: true
-    }
-
-    section ("Virtual Hold Switch for Override") {
-      input "thermHoldSwitch", "capability.switch", required: true, title: "Choose the virtual hold switch:"
+    section ("Heating/Cooling Changeover Temperatures") {
+      input "modeThresCool", "decimal", title: "Cooling temperature threshold:", required: true
+      input "modeThresHeat", "decimal", title: "Heating temperature threshold:", required: true
     }
 
     section ("Default Away Mode Temperatures") {
@@ -80,9 +69,20 @@ def mainPage() {
 	  input "awayHeatTemp", "number", title: "Default away heating temperature:", multiple: false, required: true
     }
 
+    section ("Virtual Hold Switch for Override") {
+      input "thermHoldSwitch", "capability.switch", required: true, title: "Choose the virtual hold switch:"
+    }
+
     section ("Application Authentication Key") {
       input "appKey", "text", title: "Numbers or text, 8 character minimum:", multiple: false, required: true
     }
+    
+    section ("Advanced: Comfort Calculation Tweaks") {
+      paragraph title: "Warning!", "Setting these values out of range from the assigned defaults can have disasterous effects. Don't change these values without thoroughly testing. Safe tweak ranges for temperature are .1 to .5. Safe tweak ranges for humidity are .001 to .008."
+      input "tweakTemp", "decimal", title: "Tweak temperature:", required: true, defaultValue:".3"
+      input "tweakHumi", "decimal", title: "Tweak humidity:", required: true, defaultValue:".001"
+    }
+
   }
 }
 
