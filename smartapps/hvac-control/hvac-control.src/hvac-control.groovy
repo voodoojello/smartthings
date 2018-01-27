@@ -79,8 +79,8 @@ def mainPage() {
     
     section ("Advanced: Comfort Calculation Tweaks") {
       paragraph title: "Warning!", "Setting these values out of range from the assigned defaults can have disasterous effects. Don't change these values without thoroughly testing. Safe tweak ranges for temperature are .1 to .5. Safe tweak ranges for humidity are .001 to .008."
-      input "tweakTemp", "decimal", title: "Tweak temperature:", required: true, defaultValue:".3"
-      input "tweakHumi", "decimal", title: "Tweak humidity:", required: true, defaultValue:".001"
+      input "tweakTemp", "decimal", title: "Tweak temperature:", required: true, defaultValue:0.3
+      input "tweakHumi", "decimal", title: "Tweak humidity:", required: true, defaultValue:0.001
     }
 
   }
