@@ -69,17 +69,17 @@ def mainRouter() {
   log.trace "PWS Data: ${pwsData.pws}"
 
   // Pump Switch
-  if (pwsData.pws.outtemp >= pumpHighTempThres) {
+  if (pwsData.pws.tempf >= pumpHighTempThres) {
     state.pumpSwitchState = 'OFF'
-    state.pumpSwitchCause = "Temperature: ${pwsData.pws.outtemp} / ${pumpHighTempThres}"
+    state.pumpSwitchCause = "Temperature: ${pwsData.pws.tempf} / ${pumpHighTempThres}"
   }
-  else if (pwsData.pws.outtemp <= pumpLowTempThres) {
+  else if (pwsData.pws.tempf <= pumpLowTempThres) {
     state.pumpSwitchState = 'OFF'
-    state.pumpSwitchCause = "Temperature: ${pwsData.pws.outtemp} / ${pumpLowTempThres}"
+    state.pumpSwitchCause = "Temperature: ${pwsData.pws.tempf} / ${pumpLowTempThres}"
   }
   else {
     state.pumpSwitchState = 'ON'
-    state.pumpSwitchCause = "Temperature: ${pwsData.pws.outtemp} / ${pumpLowTempThres} / ${pumpHighTempThres}"
+    state.pumpSwitchCause = "Temperature: ${pwsData.pws.tempf} / ${pumpLowTempThres} / ${pumpHighTempThres}"
   }
 
   if (pumpHoldSwitch.currentSwitch == 'on') {
@@ -97,17 +97,17 @@ def mainRouter() {
   log.trace "Pool Pump turned ${state.pumpSwitchState}: ${state.pumpSwitchCause}"
 
   // Sprayer Switch
-  if (pwsData.pws.outtemp <= sprayerLowTempThres) {
+  if (pwsData.pws.tempf <= sprayerLowTempThres) {
     state.sprayerSwitchState = 'OFF'
-    state.sprayerSwitchCause = "Temperature: ${pwsData.pws.outtemp} / ${sprayerLowTempThres}"
+    state.sprayerSwitchCause = "Temperature: ${pwsData.pws.tempf} / ${sprayerLowTempThres}"
   }
-  else if (pwsData.pws.avgwind >= sprayerHighWindThres) {
+  else if (pwsData.pws.windspeedmph >= sprayerHighWindThres) {
     state.sprayerSwitchState = 'OFF'
-    state.sprayerSwitchCause = "Wind Speed: ${pwsData.pws.avgwind} / ${sprayerHighWindThres}"
+    state.sprayerSwitchCause = "Wind Speed: ${pwsData.pws.windspeedmph} / ${sprayerHighWindThres}"
   }
   else {
     state.sprayerSwitchState = 'ON'
-    state.sprayerSwitchCause = "Temperature: ${pwsData.pws.outtemp} / ${sprayerLowTempThres} - ${pwsData.pws.avgwind} / ${sprayerHighWindThres}"
+    state.sprayerSwitchCause = "Temperature: ${pwsData.pws.tempf} / ${sprayerLowTempThres} - ${pwsData.pws.windspeedmph} / ${sprayerHighWindThres}"
   }
 
   if (sprayerHoldSwitch.currentSwitch == 'on') {

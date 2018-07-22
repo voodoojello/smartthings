@@ -136,7 +136,7 @@ def mainRouter() {
     sendNotificationEvent("HVACC: thermHoldSwitch is ON, no action taken.")
   }
   else {
-    sendNotificationEvent("HVACC: Set HVAC mode to ${hvac_mode}, set temperature to ${pwsData.hvac.set_temp} (${adj_temp} adjusted, ${currMode} mode, Night ${pwsData.hvac.nightmode}). OS Temperature: ${pwsData.pws.outtemp}°. OS Humidity: ${pwsData.pws.outhumi}%.")
+    sendNotificationEvent("HVACC: Set HVAC mode to ${hvac_mode}, set temperature to ${pwsData.hvac.set_temp} (${adj_temp} adjusted, ${currMode} mode, Night ${pwsData.hvac.nightmode}). OS Temperature: ${pwsData.pws.tempf}°. OS Humidity: ${pwsData.pws.humidity}%.")
   }
 
   log.trace "HVACC [${thermostats[0].label}] latestTempValue: ${thermostats[0].latestValue("temperature")}"
@@ -150,9 +150,9 @@ def mainRouter() {
   log.info "HVACC thermHoldSwitchState: ${thermHoldSwitch.currentSwitch}"
   log.info "HVACC set_temp: ${set_temp}"
   log.info "HVACC night_mode: ${pwsData.hvac.nightmode}"
-  log.info "HVACC PWS outtemp: ${pwsData.pws.outtemp}"
-  log.info "HVACC PWS outhumi: ${pwsData.pws.outhumi}"
-  log.info "HVACC PWS apptemp: ${pwsData.pws.apptemp}"
+  log.info "HVACC PWS outtemp: ${pwsData.pws.tempf}"
+  log.info "HVACC PWS outhumi: ${pwsData.pws.humidity}"
+  log.info "HVACC PWS apptemp: ${pwsData.pws.feelsLike}"
   log.info "HVACC PWS set_temp: ${pwsData.hvac.set_temp}"
   log.info "HVACC PWS adj_temp: ${pwsData.hvac.adj_temp}"
   log.info "HVACC PWS diff_temp: ${pwsData.hvac.diff_temp}"

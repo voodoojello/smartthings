@@ -99,9 +99,9 @@ def mainRouter() {
   def dontStartHighTime = timeToday(dontRunHighBefore,tz)
 
   // High Light Conditions and Actions
-  if (pwsData.pws.solarrad >= srStartHighLevel && pwsData.pws.solarrad >= srStopLevel && now() >= dontStartHighTime.time && location.mode != dontRunHighMode) {
+  if (pwsData.pws.solarradiation >= srStartHighLevel && pwsData.pws.solarradiation >= srStopLevel && now() >= dontStartHighTime.time && location.mode != dontRunHighMode) {
     if (state.isHighSet == false) {
-      def srHighMsg = "SRLC HIGH (${pwsData.pws.solarrad}):\n"
+      def srHighMsg = "SRLC HIGH (${pwsData.pws.solarradiation}):\n"
       
       if (srHighOffDevices != null) {
         srHighOffDevices.off()
@@ -134,9 +134,9 @@ def mainRouter() {
   }
 
   // Low Light Conditions and Actions
-  if (pwsData.pws.solarrad <= srStartLowLevel && pwsData.pws.solarrad >= srStopLevel && now() >= dontStartLowTime.time && location.mode != dontRunLowMode) {
+  if (pwsData.pws.solarradiation <= srStartLowLevel && pwsData.pws.solarradiation >= srStopLevel && now() >= dontStartLowTime.time && location.mode != dontRunLowMode) {
     if (state.isLowSet == false) {
-      def srLowMsg = "SRLC LOW (${pwsData.pws.solarrad}):\n"
+      def srLowMsg = "SRLC LOW (${pwsData.pws.solarradiation}):\n"
       
       if (srLowOffDevices != null ) {
       	srLowOffDevices.off()
@@ -168,7 +168,7 @@ def mainRouter() {
     state.isLowSet = false
   }
 
-  log.info "SRLC Solar Radiation: ${pwsData.pws.solarrad}"
+  log.info "SRLC Solar Radiation: ${pwsData.pws.solarradiation}"
   log.info "SRLC PWS Verification: ${pwsData.app.updated_long}"
   log.info "SRLC Result: HIGH:${state.isHighSet} LOW:${state.isLowSet} (${state.lastRun})"
 }
