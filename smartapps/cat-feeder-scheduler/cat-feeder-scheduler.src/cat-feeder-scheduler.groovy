@@ -22,7 +22,7 @@ definition (
   name: "Cat Feeder Scheduler",
   namespace: "cat-feeder-scheduler",
   author: "Mark Page",
-  description: "Daily run times and intervals for automatic cat feeder. Allows for two feedings per day.",
+  description: "Daily run times and intervals for automatic cat feeder. Allows for three feedings per day.",
   singleInstance: true,
   category: "SmartThings Internal",
   iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-256px.png",
@@ -32,7 +32,7 @@ definition (
 
 preferences {
   section {
-    paragraph "Daily run times and intervals for automatic cat feeder. Allows for two feedings per day."
+    paragraph "Daily run times and intervals for automatic cat feeder. Allows for three feedings per day."
   }
   section {
     input "catfeederDevice", "capability.switch", title: "Select device to control cat feeder:", required: true
