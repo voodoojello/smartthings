@@ -1,10 +1,11 @@
 /**
  *  Ambient PWS JSON Proxy Device Handler
  *
- *  This device handler is for the Ambient Weather Station and depends on a JSON proxy to scrape the weather station
- *  "livedata" (livedata.htm) page. This script is available at https://gist.github.com/voodoojello.
+ *  This device handler is for the Ambient Weather Station and depends on a JSON proxy to pull data 
+ *  from the Ambient Weather API and/or a METAR source. This script is available at:
+ *  https://gist.github.com/voodoojello.
  * 
- *  Copyright (c)2017 Mark Page (mark@very3.net)
+ *  Copyright (c)2018 Mark Page (mark@very3.net)
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -19,7 +20,7 @@
 metadata {
   definition (
     name: "Ambient PWS JSON Proxy Device Handler",
-    version: "17.10.29.1b",
+    version: "18.7.22.14c",
     namespace: "apws-device-handler",
     author: "Mark Page",
     description: "Virtual device handler for Ambient PWS JSON proxy",
@@ -108,48 +109,50 @@ def initialize() {
 }
 
 def poll() {
-  def pwsData = fetchJSON("http://pws.very3.net")
-  def spacer  = "\t●\t"
+  def pwsData = fetchJSON("https://pws.very3.net")
+  def spacer  = "\t○\t"
 
-  sendEvent(name:"temperature", value:pwsData.pws.outtemp, unit:"F")
-  sendEvent(name:"ultravioletIndex", value:pwsData.pws.uvi)
-  sendEvent(name:"illuminance", value:pwsData.pws.solarrad, unit:"lux")
-  sendEvent(name:"humidity", value:pwsData.pws.outhumi, unit:"%")
+  sendEvent(name:"temperature", value:pwsData.pws.tempf, unit:"F")
+  sendEvent(name:"ultravioletIndex", value:pwsData.pws.uv)
+  sendEvent(name:"illuminance", value:pwsData.pws.solarradiation, unit:"lux")
+  sendEvent(name:"humidity", value:pwsData.pws.humidity, unit:"%")
   sendEvent(name:"updated", value: pwsData.app.updated_long)
 
-  sendEvent(name:"outtemp", value:pwsData.pws.outtemp, unit:"F")
-  sendEvent(name:"apptemp", value:pwsData.pws.apptemp, unit:"F")
-  sendEvent(name:"heatindex", value:pwsData.pws.heatindex, unit:"F")
-  sendEvent(name:"temp_composite", value:"Heat Index: ${pwsData.pws.heatindex}°F\nFeels Like: ${pwsData.pws.apptemp}°F")
+  sendEvent(name:"tempf", value:pwsData.pws.tempf, unit:"F")
+  sendEvent(name:"feelsLike", value:pwsData.pws.feelsLike, unit:"F")
+  sendEvent(name:"temp_composite", value:"Feels Like: ${pwsData.pws.feelsLike}°F")
 
-  sendEvent(name:"solarrad", value:pwsData.pws.solarrad)
-  sendEvent(name:"uvi", value:pwsData.pws.uvi)
+  sendEvent(name:"solarradiation", value:pwsData.pws.solarradiation)
   sendEvent(name:"uv", value:pwsData.pws.uv)
-  sendEvent(name:"uv_composite", value:"SR: ${pwsData.pws.solarrad} w/m2${spacer}UV: ${pwsData.pws.uv} w/m2${spacer}UVI: ${pwsData.pws.uvi}")
+  sendEvent(name:"uv_composite", value:"SR: ${pwsData.pws.solarradiation} w/m2${spacer}UVI: ${pwsData.pws.uv}")
   
-  sendEvent(name:"dewpoint", value:pwsData.pws.dewpoint, unit:"F")
-  sendEvent(name:"outhumi", value:pwsData.pws.outhumi, unit:"%")
-  sendEvent(name:"humidity_composite", value: "Humidity: ${pwsData.pws.outhumi}%${spacer}Dewpoint: ${pwsData.pws.dewpoint}°F")
+  sendEvent(name:"dewPoint", value:pwsData.pws.dewPoint, unit:"F")
+  sendEvent(name:"humidity", value:pwsData.pws.humidity, unit:"%")
+  sendEvent(name:"humidity_composite", value: "Humidity: ${pwsData.pws.humidity}%${spacer}Dewpoint: ${pwsData.pws.dewPoint}°F")
   
-  sendEvent(name:"rainofdaily", value:pwsData.pws.rainofdaily, unit:"in")
-  sendEvent(name:"rainofhourly", value:pwsData.pws.rainofhourly, unit:"in")
-  sendEvent(name:"rainofweekly", value:pwsData.pws.rainofweekly, unit:"in")
-  sendEvent(name:"rainofmonthly", value:pwsData.pws.rainofmonthly, unit:"in")
-  sendEvent(name:"rainofyearly", value:pwsData.pws.rainofyearly, unit:"in")
-  sendEvent(name:"rain_composite", value: "Today: ${pwsData.pws.rainofdaily}\"${spacer}Week: ${pwsData.pws.rainofweekly}\"${spacer}Month: ${pwsData.pws.rainofmonthly}\"${spacer}Year: ${pwsData.pws.rainofyearly}\"")
+  sendEvent(name:"baromabsin", value:pwsData.pws.baromabsin, unit:"in")
+  sendEvent(name:"baromrelin", value:pwsData.pws.baromrelin, unit:"in")
+  sendEvent(name:"pressure_composite", value: "ABSP: ${pwsData.pws.baromabsin} inMg${spacer}RELP: ${pwsData.pws.baromrelin} inMg")
+
+  sendEvent(name:"hourlyrainin", value:pwsData.pws.hourlyrainin, unit:"in")
+  sendEvent(name:"dailyrainin", value:pwsData.pws.dailyrainin, unit:"in")
+  sendEvent(name:"weeklyrainin", value:pwsData.pws.weeklyrainin, unit:"in")
+  sendEvent(name:"monthlyrainin", value:pwsData.pws.monthlyrainin, unit:"in")
+  sendEvent(name:"yearlyrainin", value:pwsData.pws.yearlyrainin, unit:"in")
+  sendEvent(name:"totalrainin", value:pwsData.pws.totalrainin, unit:"in")
+  sendEvent(name:"rain_composite", value: "D: ${pwsData.pws.dailyrainin}\"${spacer}W: ${pwsData.pws.weeklyrainin}\"${spacer}M: ${pwsData.pws.monthlyrainin}\"${spacer}Y: ${pwsData.pws.totalrainin}\"")
 
   def cardinalPoints = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW","N"]
-  def cardinalIndex  = pwsData.pws.windir%360
+  def cardinalIndex  = pwsData.pws.winddir%360
       cardinalIndex  = Math.round(cardinalIndex/22.5)
   
-  sendEvent(name:"avgwind", value:pwsData.pws.avgwind, unit:"mph")
-  sendEvent(name:"windir", value:pwsData.pws.windir, unit:"dir")
-  sendEvent(name:"gustspeed", value:pwsData.pws.gustspeed, unit:"mph")
-  sendEvent(name:"wind_composite", value: "Speed: ${pwsData.pws.avgwind} mph${spacer}Gust: ${pwsData.pws.gustspeed} mph${spacer}Dir: ${cardinalPoints[cardinalIndex.toInteger()]} (${pwsData.pws.windir}°)")
+  sendEvent(name:"winddir", value:pwsData.pws.winddir, unit:"dir")
+  sendEvent(name:"windspeedmph", value:pwsData.pws.windspeedmph, unit:"mph")
+  sendEvent(name:"windgustmph", value:pwsData.pws.windgustmph, unit:"mph")
+  sendEvent(name:"maxdailygust", value:pwsData.pws.maxdailygust, unit:"mph")
+  sendEvent(name:"wind_composite", value: "S: ${pwsData.pws.windspeedmph} mph${spacer}G: ${pwsData.pws.windgustmph} mph${spacer}D: ${cardinalPoints[cardinalIndex.toInteger()]} (${pwsData.pws.winddir}°)")
   
-  sendEvent(name:"abspress", value:pwsData.pws.abspress, unit:"in")
-  sendEvent(name:"relpress", value:pwsData.pws.relpress, unit:"in")
-  sendEvent(name:"pressure_composite", value: "ABS Pressure: ${pwsData.pws.abspress}\"${spacer}REL Pressure: ${pwsData.pws.relpress}\"")
+  sendEvent(name:"battout", value:pwsData.pws.battout)
 }
 
 def fetchJSON(pwsURI) {
