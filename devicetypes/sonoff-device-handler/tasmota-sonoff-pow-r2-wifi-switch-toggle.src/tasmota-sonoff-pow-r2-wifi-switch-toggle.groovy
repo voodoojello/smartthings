@@ -33,15 +33,12 @@ metadata {
     iconX2Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png",
     iconX3Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png"
   ) {
-    capability "Actuator"
-    capability "Switch"
-    capability "Refresh"
-    capability "Configuration"
-    capability "Voltage Measurement"
-    capability "Power Meter"
-    capability "Health Check"
-    capability "Outlet"
-  }
+      capability "Actuator"
+      capability "Switch"
+      capability "Refresh"
+      capability "Configuration"
+      capability "Outlet"
+    }
 
   simulator {
   }
@@ -49,6 +46,7 @@ metadata {
   preferences {
     input name: "ipAddr", type: "text", title: "IP Address", description: "IP Address of the device", required: true,displayDuringSetup: true
     input name: "port", type: "number", title: "Port", description: "Port of the device",  defaultValue: 80 ,displayDuringSetup: true
+    input name: "toggletime", type: "number", title: "Toggle Time (msecs)", description: "State Toggle Time (msecs)",  defaultValue: 600 ,displayDuringSetup: true
     input name: "username", type: "text", title: "Username", description: "Username to manage the device", required: true, displayDuringSetup: true
     input name: "password", type: "password", title: "Password", description: "Username to manage the device", required: true, displayDuringSetup: true
   }
@@ -58,29 +56,17 @@ metadata {
       tileAttribute ("device.switch", key: "PRIMARY_CONTROL") {
         attributeState "on", label:'${name}', action:"switch.off", backgroundColor:"#00a0dc", icon: "st.switches.switch.on", nextState:"turningOff"
         attributeState "off", label:'${name}', action:"switch.on", backgroundColor:"#ffffff", icon: "st.switches.switch.off", nextState:"turningOn"
-        attributeState "turningOn", label:'Turning On', action:"switch.off", backgroundColor:"#00a0dc", icon: "st.switches.switch.off", nextState:"turningOn"
-        attributeState "turningOff", label:'Turning Off', action:"switch.on", backgroundColor:"#ffffff", icon: "st.switches.switch.on", nextState:"turningOff"
+        attributeState "turningOn", label:'Toggling On', action:"switch.off", backgroundColor:"#00a0dc", icon: "st.switches.switch.off", nextState:"turningOn"
+        attributeState "turningOff", label:'Toggling Off', action:"switch.on", backgroundColor:"#ffffff", icon: "st.switches.switch.on", nextState:"turningOff"
       }
     }
     standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
       state "default", label:"", action:"refresh.refresh", icon:"st.secondary.refresh"
     }
-    valueTile("power", "device.power", width: 2, height: 2) {
-      state "default", label:'${currentValue} W'
-    }
-    valueTile("voltage", "device.voltage", width: 2, height: 2) {
-      state "default", label:'${currentValue} V'
-    }
-    valueTile("amperage", "device.amperage", width: 2, height: 2) {
-      state "default", label:'${currentValue} A'
-    }
-    valueTile("amperage", "device.amperage", width: 2, height: 2) {
-      state "default", label:'${currentValue} A'
-    }
  }
 
   main(["switch"])
-  details(["switch", "power", "amperage", "voltage", "refresh"])
+  details(["switch", "refresh"])
 }
 
 def installed() {
@@ -131,55 +117,26 @@ private callTasmota(cll) {
 }
 
 private updateTasmotaStatus(){
-  callTasmota("Status%208")
+  callTasmota("status")
 }
 
 def updated() {
-  if (ipAddr!=null) {
+  if (ipAddr != null) {
     device.deviceNetworkId  = ipAddr
     callTasmota("Backlog%20Weblog%204")
-    sendEvent(name: "checkInterval", value: 5, displayed: false, data: [protocol: "lan", hubHardwareId: device.hub.hardwareID])
+    sendEvent(name: "checkInterval", value: 5, displayed: true, data: [protocol: "lan", hubHardwareId: device.hub.hardwareID])
     updateTasmotaStatus()
   }
 }
 
 def parse(description) {
   def msg = parseLanMessage(description)
-  if (msg.json !=null) {
-    if (msg.json.StatusSNS!=null) {
-      if (msg.json.StatusSNS.ENERGY.Voltage > 0) {
-        if (device.currentValue("switch") == "off" ) {
-          sendEvent(name: "switch", value: 'on')
-        }
-        runIn(1, ping)
-      }
-      else {
-        if (device.currentValue("switch") == "on" ) {
-          sendEvent(name: "switch", value: 'off')
-        }
-      }
-    
-      sendEvent(name:"power", value: msg.json.StatusSNS.ENERGY.Power, unit: "W", displayed: true)
-      sendEvent(name:"voltage", value: msg.json.StatusSNS.ENERGY.Voltage, unit: "V", displayed: true)
-      sendEvent(name:"amperage", value: msg.json.StatusSNS.ENERGY.Current, unit: "A", displayed: true)
+  if (msg.json != null && msg.json.Status != null) {
+    if (msg.json.Status.Power > 0) {
+      sendEvent(name: "switch", value: 'on')
     }
-    else if (msg.json.Status!=null) {
-      if (msg.json.Status.Power == "1"){
-        ping()
-        sendEvent(name: "switch", value: 'on')
-      }
-      else if (msg.json.Status.Power=="0"){
-        sendEvent(name: "switch", value: 'off')
-      }
-    }
-    else if (msg.json.POWER!=null) {
-      if (msg.json.POWER == "ON"){
-        ping()
-        sendEvent(name: "switch", value: 'on')
-      }
-      else{
-        sendEvent(name: "switch", value: 'off')
-      }
+    else {
+      sendEvent(name: "switch", value: 'off')
     }
   }
   else {
@@ -187,13 +144,13 @@ def parse(description) {
   }
 }
 
-def on() {
-  callTasmota("Backlog%20Power%20OFF%3BDelay%20600%3BPower%20ON")
+def off() {
+  callTasmota("Backlog%20Power%20OFF%3BDelay%20${toggletime}%3BPower%20ON")
   refresh()
 }
 
-def off() {
-  callTasmota("Backlog%20Power%20ON%3BDelay%20600%3BPower%20OFF")
+def on() {
+  callTasmota("Backlog%20Power%20ON%3BDelay%20${toggletime}%3BPower%20OFF")
   refresh()
 }
 
