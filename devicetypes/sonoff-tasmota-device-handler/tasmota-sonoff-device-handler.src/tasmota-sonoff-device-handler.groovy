@@ -42,7 +42,9 @@ metadata {
       capability "Refresh"
       capability "Configuration"
       capability "Outlet"
-      command "visitDevice"
+      command "deviceToggle"
+      command "deviceOn"
+      command "deviceOff"
     }
 
   simulator {
@@ -52,7 +54,6 @@ metadata {
   preferences {
     input name: "lanDevIPAddr", type: "text", title: "LAN Device IP Address", description: "IP Address of the device", required: true, displayDuringSetup: true
     input name: "lanDevIPPort", type: "number", title: "LAN Device IP Port", description: "Port of the device",  defaultValue: "80", displayDuringSetup: true
-    input name: "switchMode", type: "enum", title: "Switch Mode", desciption: "Standard on/off or on-off-on/off-on-off interval toggle", options: ["Standard","Toggle"], displayDuringSetup: true
     input name: "toggleTime", type: "number", title: "Toggle Time (secs)", description: "Toggle time in seconds (for toggle switch mode)", defaultValue: 60 ,displayDuringSetup: true
     input name: "tasmotaUser", type: "text", title: "Tasmota Username", description: "Username to manage the device", required: true, displayDuringSetup: true
     input name: "tasmotaPass", type: "password", title: "Tasmota Password", description: "Username to manage the device", required: true, displayDuringSetup: true
@@ -61,44 +62,48 @@ metadata {
   tiles (scale: 2) {
     multiAttributeTile(name:"switch", type: "generic", width: 6, height: 4, canChangeIcon: true){
       tileAttribute ("device.switch", key: "PRIMARY_CONTROL") {
-        attributeState "on", label:'${name}', action:"switch.off", backgroundColor:"#00a0dc", icon: "st.switches.switch.on", nextState:"turningOff"
-        attributeState "off", label:'${name}', action:"switch.on", backgroundColor:"#ffffff", icon: "st.switches.switch.off", nextState:"turningOn"
-        attributeState "turningOn", label:'Turning On', action:"switch.off", backgroundColor:"#00a0dc", icon: "st.switches.switch.off", nextState:"turningOn"
-        attributeState "turningOff", label:'Turning Off', action:"switch.on", backgroundColor:"#ffffff", icon: "st.switches.switch.on", nextState:"turningOff"
+        attributeState "on", label:'${name}', action:"deviceOff", backgroundColor:"#00a0dc", icon: "st.switches.switch.on", nextState:"turningOff"
+        attributeState "off", label:'${name}', action:"deviceOn", backgroundColor:"#ffffff", icon: "st.switches.switch.off", nextState:"turningOn"
+        attributeState "turningOn", label:'Turning On', action:"deviceOff", backgroundColor:"#00a0dc", icon: "st.switches.switch.off", nextState:"turningOn"
+        attributeState "turningOff", label:'Turning Off', action:"deviceOn", backgroundColor:"#ffffff", icon: "st.switches.switch.on", nextState:"turningOff"
       }
     }
-    standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 3, height: 2) {
-      state "default", label:"Refresh", action:"refresh.refresh", icon:"st.secondary.refresh"
+    standardTile("toggle", "device.switch", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
+      state "default", label:'Timed Toggle', action:"deviceToggle", icon:"st.Health & Wellness.health7"
     }
-    standardTile("deviceURL", "device.switch", inactiveLabel: false, decoration: "flat", width: 3, height: 2) {
-      state "default", label:"Visit Device", action:"visitDevice", icon:"st.Home.home2"
+    standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
+      state "default", label:"Refresh", action:"refresh.refresh", icon:"st.secondary.refresh"
     }
  }
 
   main(["switch"])
-  details(["switch", "refresh", "deviceURL"])
+  details(["switch", "toggle", "refresh", "deviceURL"])
 }
 
 def installed() {
+  initialize()
 }
 
 def configure() {
-  callDevice("Status")
+  initialize()
 }
 
 def refresh() {
-  callDevice("Status")
+  initialize()
 }
   
 def updated() {
-  callDevice("Status")
   sendEvent(name: "checkInterval", value: 1, displayed: false, data: [protocol: "lan", hubHardwareId: device.hub.hardwareID])
+  initialize()
 }
 
-def visitDevice() {
-  //"http://${lanDevIPAddr}"
+def initialize() {
+  callDevice("Status")
+  state.deviceState = ""
 }
-  
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 private getCallBackAddress() {
   return device.hub.getDataValue("localIP")+":"+device.hub.getDataValue("localSrvPortTCP")
 }
@@ -125,10 +130,11 @@ private callDevice(cmnd) {
       ]
     )
     sendHubCommand(hubResponse)
+    log.debug "TDH [callDevice]: cmnd: ${cmnd}, hubResponse: ${hubResponse}"
     return hubResponse
   }
   catch (Exception e) {
-    log.debug "TDH: Exception [${e} on ${hubResponse}]"
+    log.debug "TDH [callDevice]: Exception [${e} on ${hubResponse}]"
   }
   
   return null
@@ -136,29 +142,30 @@ private callDevice(cmnd) {
   
 def parse(description) {
   def msg = parseLanMessage(description)
+  log.debug "TDH [parse]: msg.json: ${msg.json}"
 
   if (msg.status == 200) {
     if (msg.json != null) {
-      log.debug "TDH [Status JSON]: ${msg.json}"
-      
       if (msg.json.Status?.Power != null) {
         if (msg.json.Status.Power == 1) {
+          state.deviceState = 'on'
           sendEvent(name: "switch", value: 'on')
         }
         if (msg.json.Status.Power == 0) {
+          state.deviceState = 'off'
           sendEvent(name: "switch", value: 'off')
         }
       }
-      
       if (msg.json.Status?.POWER != null) {
         if (msg.json.Status.POWER == 'ON') {
+          state.deviceState = 'on'
           sendEvent(name: "switch", value: 'on')
         }
         if (msg.json.Status.POWER == 'OFF') {
+          state.deviceState = 'off'
           sendEvent(name: "switch", value: 'off')
         }
       }
-      
     }
   }
   else {
@@ -166,29 +173,28 @@ def parse(description) {
   }
 }
 
-
-def on() {
-  def action = "Power%20ON"
+def deviceToggle() {
+  def delay = toggleTime*10
+  def uri = "Backlog%20Power%20ON%3BDelay%20${delay}%3BPower%20OFF"
   
-  if ("${switchMode}" == "Toggle") {
-    action = "Backlog%20Power%20ON%3BDelay%20${toggleTime}%3BPower%20OFF"
+  if (state.deviceState == 'on') {
+    uri = "Backlog%20Power%20OFF%3BDelay%20${delay}%3BPower%20ON"
   }
   
-  log.debug "TDH [action (on)]: ${action}, ${switchMode}"
-  callDevice(action)
+  log.debug "TDH [deviceToggle]: State: ${state.deviceState}, URI:${uri}"
+  
+  callDevice(uri)
+  callDevice("Status")
 }
 
-
-def off() {
-  def action = "Power%20OFF"
-  
-  if ("${switchMode}" == "Toggle") {
-    action = "Backlog%20Power%20OFF%3BDelay%20${toggleTime}%3BPower%20ON"
-  }
-  
-  log.debug "TDH [action (off)]: ${action}, ${switchMode}"
-  callDevice(action)
+def deviceOn() {
+  callDevice("Power%20ON")
+  callDevice("Status")
 }
 
+def deviceOff() {
+  callDevice("Power%20OFF")
+  callDevice("Status")
+}
 
 
