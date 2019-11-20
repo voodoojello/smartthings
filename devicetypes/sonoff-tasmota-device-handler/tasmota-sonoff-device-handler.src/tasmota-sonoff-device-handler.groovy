@@ -3,10 +3,10 @@
  *  Copyright (c)2019-2020 Mark Page (mark@very3.net)
  *  Modified: Tue Nov 18 19:31:17 CST 2019
  *
- *  This device handler is for ESP8266 based Sonoff Basic devices running Tasmota 6.6.0 or higher. 
+ *  This device handler is for ESP8266 based Sonoff Basic devices running Tasmota 6.6.0 or higher.
  *  In theory this *should* work with any single-relay ESP8266 device running Tasmota, YMMV.
  *
- *  Devices can act as standard on/off switches or as "toggles" (on/off/on, off/on/off) with preset 
+ *  Devices can act as standard on/off switches or as "toggles" (on/off/on, off/on/off) with preset
  *  timed intervals. For more  info on Tasmota and the Sonoff Basic see:
  *
  *      BASICR2 Wi-Fi DIY Smart Switch
@@ -14,14 +14,14 @@
  *
  *      Tasmota: Alternative firmware for ESP8266 based devices
  *      https://github.com/arendst/Tasmota
- * 
+ *
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the License is 
+ *  Unless required by applicable law or agreed to in writing, software distributed under the License is
  *  distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and limitations under the License.
  *
@@ -61,6 +61,7 @@ metadata {
     input name: "lanDevIPAddr", type: "text", title: "LAN Device IP Address", description: "IP Address of the device", required: true, displayDuringSetup: true
     input name: "lanDevIPPort", type: "number", title: "LAN Device IP Port", description: "Port of the device",  defaultValue: "80", displayDuringSetup: true
     input name: "toggleTime", type: "number", title: "Toggle Time (secs)", description: "Toggle time in seconds (for toggle mode)", defaultValue: "60" ,displayDuringSetup: true
+    input name: "switchMode", type: "enum", title: "Default Switch Mode", description: "Standard or Toggle Mode", options: ["Standard","Toggle"], required: true, displayDuringSetup: true
     input name: "tasmotaUser", type: "text", title: "Tasmota Username", description: "Username to manage the device", required: true, displayDuringSetup: true
     input name: "tasmotaPass", type: "password", title: "Tasmota Password", description: "Username to manage the device", required: true, displayDuringSetup: true
   }
@@ -80,10 +81,13 @@ metadata {
     standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 3, height: 2) {
       state "default", label:"Refresh", action:"refresh.refresh", icon:"st.secondary.refresh"
     }
+    valueTile("wifirssi", "device.wifirssi", decoration: "flat", width: 2, height: 2) {
+      state "default", label:'${currentValue}', action:"", icon:"st.Entertainment.entertainment15"
+    }
  }
 
   main(["switch"])
-  details(["switch", "toggle", "refresh"])
+  details(["switch", "toggle", "refresh", "wifirssi"])
 }
 
 def installed() {
@@ -99,18 +103,14 @@ def refresh() {
 }
   
 def updated() {
+  unschedule()
   initialize()
 }
 
 def initialize() {
-  callDevice("Power")
+  sendCmnd("Status 0")
   state.deviceState = ""
-  sendEvent(name: "checkInterval", value: 1, displayed: false, data: [protocol: "lan", hubHardwareId: device.hub.hardwareID])
-  runEvery1Minute(poll)
-}
-
-def poll() {
-  callDevice("Power")
+  createEvent(name: "checkInterval", value: 1, displayed: false, data: [protocol: "lan", hubHardwareId: device.hub.hardwareID])
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,12 +125,15 @@ private String ipToHex(ipaddr,ipport) {
   return hexipaddr+':'+hexipport
 }
   
-private callDevice(cmnd) {
+private sendCmnd(cmnd) {
   def hubip   = device.hub.getDataValue("localIP")
   def hubport = device.hub.getDataValue("localSrvPortTCP")
   def lanHost = ipToHex(lanDevIPAddr,lanDevIPPort)
-    
+  
   device.deviceNetworkId = lanHost
+    
+  cmnd = cmnd.replaceAll(' ','%20')
+  cmnd = cmnd.replaceAll(';','%3B')
 
   try {
     def hubResponse = new physicalgraph.device.HubAction(
@@ -141,11 +144,11 @@ private callDevice(cmnd) {
       ]
     )
     sendHubCommand(hubResponse)
-    //log.debug "TDH [callDevice]: cmnd: ${cmnd}, hubResponse: ${hubResponse}"
+    log.debug "TDH [sendCmnd]: cmnd: ${cmnd}, hubResponse: ${hubResponse}"
     return hubResponse
   }
   catch (Exception e) {
-    log.debug "TDH [callDevice]: Exception [${e} on ${hubResponse}]"
+    log.debug "TDH [sendCmnd]: Exception [${e} on ${hubResponse}]"
   }
   
   return null
@@ -153,9 +156,14 @@ private callDevice(cmnd) {
   
 def parse(description) {
   def msg = parseLanMessage(description)
+  log.debug "TDH [parse]: msg: ${msg.json}"
 
   if (msg.status == 200) {
     if (msg.json != null) {
+      if (msg.json.StatusSTS?.Wifi?.RSSI != null) {
+        sendEvent(name: "wifirssi", value: msg.json.StatusSTS.Wifi.SSId+"\n-"+msg.json.StatusSTS.Wifi.RSSI+' dB')
+      }
+      
       if (msg.json.POWER != null) {
         if (msg.json.POWER == 'ON') {
           state.deviceState = 'on'
@@ -166,8 +174,19 @@ def parse(description) {
           sendEvent(name: "switch", value: 'off')
         }
       }
+      
+      if (msg.json.Status?.Power != null) {
+        if (msg.json.Status.Power == 1) {
+          state.deviceState = 'on'
+          sendEvent(name: "switch", value: 'on')
+        }
+        if (msg.json.Status.Power == 0) {
+          state.deviceState = 'off'
+          sendEvent(name: "switch", value: 'off')
+        }
+      }
+      
     }
-    //log.debug "TDH [parse]: msg.json: ${msg.json}"
   }
   else {
     log.debug "TDH [parse]: ERROR ${msg.status}, ${msg.body}"
@@ -175,25 +194,37 @@ def parse(description) {
 }
 
 def deviceToggle() {
-  def delay = toggleTime*10
-  def uri = "Backlog%20Power%20ON%3BDelay%20${delay}%3BPower%20OFF"
+  def blinkTime = toggleTime*10
+  
+  sendCmnd("BlinkCount 1")
+  sendCmnd("BlinkTime ${blinkTime}")
+  sendCmnd("Power 3")
   
   if (state.deviceState == 'on') {
-    uri = "Backlog%20Power%20OFF%3BDelay%20${delay}%3BPower%20ON"
+    sendEvent(name: "switch", value: 'toggle')
   }
-  
-  //log.debug "TDH [deviceToggle]: State: ${state.deviceState}, URI:${uri}"
-  
-  callDevice(uri)
-  callDevice("Power")
+  if (state.deviceState == 'off') {
+    sendEvent(name: "switch", value: 'toggle')
+  }
 }
 
 def deviceOn() {
-  callDevice("Power%20ON")
-  callDevice("Power")
+  if ("${switchMode}" == "Toggle") {
+    deviceToggle()
+  }
+  else { 
+    sendCmnd("Power ON")
+    sendCmnd("Power")
+  }
 }
 
 def deviceOff() {
-  callDevice("Power%20OFF")
-  callDevice("Power")
+  if ("${switchMode}" == "Toggle") {
+    deviceToggle()
+  }
+  else { 
+    sendCmnd("Power OFF")
+    sendCmnd("Power")
+  }
 }
+
