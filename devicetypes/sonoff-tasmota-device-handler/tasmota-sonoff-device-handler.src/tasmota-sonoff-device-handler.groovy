@@ -1,13 +1,14 @@
 /*
  *  Tasmota-Sonoff Device Handler for SmartThings
  *  Copyright (c)2019-2020 Mark Page (mark@very3.net)
- *  Modified: Tue Nov 18 19:31:17 CST 2019
+ *  Modified: Wed Nov 20 21:18:56 CST 2019
  *
  *  This device handler is for ESP8266 based Sonoff Basic devices running Tasmota 6.6.0 or higher.
- *  In theory this *should* work with any single-relay ESP8266 device running Tasmota, YMMV.
- *
  *  Devices can act as standard on/off switches or as "toggles" (on/off/on, off/on/off) with preset
- *  timed intervals. For more  info on Tasmota and the Sonoff Basic see:
+ *  timers. The toggles are handy for rebooting routers, DOCSIS modems, or even the ST hub =)
+ *  In theory this *should* work with any single-relay ESP8266 device running Tasmota but YMMV.
+ *
+ *  For more  info on Tasmota and the Sonoff Basic see:
  *
  *      BASICR2 Wi-Fi DIY Smart Switch
  *      https://sonoff.tech/product/wifi-diy-smart-switches/basicr2
@@ -67,7 +68,7 @@ metadata {
   }
 
   tiles (scale: 2) {
-    multiAttributeTile(name:"switch", type: "generic", width: 6, height: 4, canChangeIcon: true){
+    multiAttributeTile(name:"switch", type: "generic", width: 6, height: 4, canChangeIcon: false){
       tileAttribute ("device.switch", key: "PRIMARY_CONTROL") {
         attributeState "on", label:'${name}', action:"deviceOff", backgroundColor:"#00a0dc", icon: "st.switches.switch.on", nextState:"turningOff"
         attributeState "off", label:'${name}', action:"deviceOn", backgroundColor:"#ffffff", icon: "st.switches.switch.off", nextState:"turningOn"
@@ -75,10 +76,10 @@ metadata {
         attributeState "turningOff", label:'Turning Off', action:"deviceOn", backgroundColor:"#ffffff", icon: "st.switches.switch.on", nextState:"turningOff"
       }
     }
-    standardTile("toggle", "device.switch", inactiveLabel: false, decoration: "flat", width: 3, height: 2) {
-      state "default", label:'Timed Toggle', action:"deviceToggle", icon:"st.Health & Wellness.health7"
+    standardTile("toggle", "device.switch", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
+      state "default", label:'Toggle', action:"deviceToggle", icon:"st.Health & Wellness.health7"
     }
-    standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 3, height: 2) {
+    standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
       state "default", label:"Refresh", action:"refresh.refresh", icon:"st.secondary.refresh"
     }
     valueTile("wifirssi", "device.wifirssi", decoration: "flat", width: 2, height: 2) {
@@ -108,9 +109,14 @@ def updated() {
 }
 
 def initialize() {
-  sendCmnd("Status 0")
   state.deviceState = ""
-  createEvent(name: "checkInterval", value: 1, displayed: false, data: [protocol: "lan", hubHardwareId: device.hub.hardwareID])
+  sendCmnd("Status 0")
+  sendEvent(name: "checkInterval", value: 60, displayed: false, data: [protocol: "lan", hubHardwareId: device.hub.hardwareID, offlinePingable: "1"])
+  runEvery1Minute(poll)
+}
+
+def poll() {
+  sendCmnd("Status 0")
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,7 +150,7 @@ private sendCmnd(cmnd) {
       ]
     )
     sendHubCommand(hubResponse)
-    log.debug "TDH [sendCmnd]: cmnd: ${cmnd}, hubResponse: ${hubResponse}"
+    //log.debug "TDH [sendCmnd]: cmnd: ${cmnd}, hubResponse: ${hubResponse}"
     return hubResponse
   }
   catch (Exception e) {
@@ -156,7 +162,7 @@ private sendCmnd(cmnd) {
   
 def parse(description) {
   def msg = parseLanMessage(description)
-  log.debug "TDH [parse]: msg: ${msg.json}"
+  //log.debug "TDH [parse]: msg: ${msg.json}"
 
   if (msg.status == 200) {
     if (msg.json != null) {
@@ -201,10 +207,10 @@ def deviceToggle() {
   sendCmnd("Power 3")
   
   if (state.deviceState == 'on') {
-    sendEvent(name: "switch", value: 'toggle')
+    sendEvent(name: "switch", value: 'off')
   }
   if (state.deviceState == 'off') {
-    sendEvent(name: "switch", value: 'toggle')
+    sendEvent(name: "switch", value: 'on')
   }
 }
 
