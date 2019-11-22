@@ -1,32 +1,33 @@
-/*
- *  Tasmota-Sonoff Device Handler for SmartThings
- *  Copyright (c)2019-2020 Mark Page (mark@very3.net)
- *  Modified: Wed Nov 20 21:18:56 CST 2019
- *
- *  This device handler is for ESP8266 based Sonoff Basic devices running Tasmota 6.6.0 or higher.
- *  Devices can act as standard on/off switches or as "toggles" (on/off/on, off/on/off) with preset
- *  timers. The toggles are handy for rebooting routers, DOCSIS modems, or even the ST hub =)
- *  In theory this *should* work with any single-relay ESP8266 device running Tasmota but YMMV.
- *
- *  For more  info on Tasmota and the Sonoff Basic see:
- *
- *      BASICR2 Wi-Fi DIY Smart Switch
- *      https://sonoff.tech/product/wifi-diy-smart-switches/basicr2
- *
- *      Tasmota: Alternative firmware for ESP8266 based devices
- *      https://github.com/arendst/Tasmota
- *
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- *  in compliance with the License. You may obtain a copy of the License at:
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software distributed under the License is
- *  distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and limitations under the License.
- *
- */
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tasmota-Sonoff Device Handler for Sma/tThings
+//  Copyright (c)2019-2020 Mark Page (mark@very3.net)
+//  Modified: Thu Nov 21 21:18:56 CST 2019
+//
+//  This device handler is for ESP8266 based Sonoff Basic devices running Tasmota 6.6.0 or higher.
+//  Devices can act as standard on/off switches or as "toggles" (on/off/on, off/on/off) with preset
+//  timers. The toggles are handy for rebooting routers, DOCSIS modems, or even the ST hub =)
+//  In theory this//should* work with any single-relay ESP8266 device running Tasmota but YMMV.
+//
+//  For more  info on Tasmota and the Sonoff Basic see:
+//
+//      BASICR2 Wi-Fi DIY Smart Switch
+//      https://sonoff.tech/product/wifi-diy-smart-switches/basicr2
+//
+//      Tasmota: Alternative firmware for ESP8266 based devices
+//      https://github.com/arendst/Tasmota
+//
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at:
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software distributed under the License is
+//  distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and limitations under the License.
+//
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
  
 import groovy.json.JsonSlurper
 include 'asynchttp_v1'
@@ -97,6 +98,8 @@ metadata {
   details(["switch", "toggle", "refresh"])
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 def installed() {
   initialize()
 }
@@ -108,7 +111,7 @@ def configure() {
 def refresh() {
   initialize()
 }
-  
+
 def updated() {
   unschedule()
   initialize()
@@ -116,12 +119,21 @@ def updated() {
 
 def initialize() {
   state.deviceState = ""
+  state.debugMode   = 0
+  logger('info','initialize',"Logging set to ${state.debugMode}")
+  
+  def unixEpoch = new Date().getTime()/1000
+  sendCmnd("Time ${unixEpoch}")
+  sendCmnd("Time 0")
+  logger('info','initialize',"Setting time to ${unixEpoch}")
+  
   sendCmnd("Status 0")
   sendEvent(name: "checkInterval", value: 60, displayed: false, data: [protocol: "lan", hubHardwareId: device.hub.hardwareID, offlinePingable: "1"])
   runEvery1Minute(poll)
 }
 
 def poll() {
+  logger('info','poll',"Starting polling cycle")
   sendCmnd("Status 0")
 }
 
@@ -156,11 +168,13 @@ private sendCmnd(cmnd) {
       ]
     )
     sendHubCommand(hubResponse)
-    //log.debug "TDH [sendCmnd]: cmnd: ${cmnd}, hubResponse: ${hubResponse}"
+    
+    logger('debug','sendCmnd',"cmnd: ${cmnd}, hubResponse: ${hubResponse}")
+
     return hubResponse
   }
   catch (Exception e) {
-    log.debug "TDH [sendCmnd]: Exception [${e} on ${hubResponse}]"
+    logger('error','sendCmnd',"Exception: ${e}, hubResponse: ${hubResponse}")
   }
   
   return null
@@ -168,7 +182,7 @@ private sendCmnd(cmnd) {
   
 def parse(description) {
   def msg = parseLanMessage(description)
-  //log.debug "TDH [parse]: msg: ${msg.body}"
+  logger('debug','parse',"${msg.body}")
 
   if (msg.status == 200) {
     if (msg.json != null) {
@@ -185,6 +199,8 @@ def parse(description) {
           state.deviceState = 'off'
           sendEvent(name: "switch", value: 'off')
         }
+        
+		logger('debug','msg.json.POWER',"${msg.json.POWER}, switchMode: ${switchMode}, deviceState: ${state.deviceState}, toggleTime: ${toggleTime}")
       }
       
       if (msg.json.Status?.Power != null) {
@@ -196,47 +212,61 @@ def parse(description) {
           state.deviceState = 'off'
           sendEvent(name: "switch", value: 'off')
         }
+        
+		logger('debug','msg.json.Status?.Power',"${msg.json.Status.Power}, switchMode: ${switchMode}, deviceState: ${state.deviceState}, toggleTime: ${toggleTime}")
       }
       
     }
   }
   else {
-    log.debug "TDH [parse]: ERROR ${msg.status}, ${msg.body}"
+    logger('error','parse',"${msg.status}, ${msg.body}")
   }
 }
 
 def deviceToggle() {
   def blinkTime = toggleTime*10
-  
+
   sendCmnd("BlinkCount 1")
   sendCmnd("BlinkTime ${blinkTime}")
   sendCmnd("Power 3")
-  
+
   if (state.deviceState == 'on') {
     sendEvent(name: "switch", value: 'off')
   }
   if (state.deviceState == 'off') {
     sendEvent(name: "switch", value: 'on')
   }
+  
+  logger('debug','deviceToggle',"switchMode: ${switchMode}, deviceState: ${state.deviceState}, toggleTime: ${toggleTime}")
 }
 
 def deviceOn() {
   if ("${switchMode}" == "Toggle") {
     deviceToggle()
   }
-  else { 
+  else {
     sendCmnd("Power ON")
     sendCmnd("Power")
   }
+  
+  logger('debug','deviceOn',"switchMode: ${switchMode}, deviceState: ${state.deviceState}, toggleTime: ${toggleTime}")
 }
 
 def deviceOff() {
   if ("${switchMode}" == "Toggle") {
     deviceToggle()
   }
-  else { 
+  else {
     sendCmnd("Power OFF")
     sendCmnd("Power")
+  }
+  
+  logger('debug','deviceOff',"switchMode: ${switchMode}, deviceState: ${state.deviceState}, toggleTime: ${toggleTime}")
+}
+
+def logger(type,loc,msg) {
+  if (state.debugMode) {
+   log."${type}" "TSDH [${loc}]: ${msg}"
   }
 }
 
