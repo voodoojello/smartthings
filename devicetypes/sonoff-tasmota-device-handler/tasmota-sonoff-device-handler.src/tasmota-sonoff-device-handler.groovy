@@ -59,12 +59,18 @@ metadata {
   }
     
   preferences {
-    input name: "lanDevIPAddr", type: "text", title: "LAN Device IP Address", description: "IP Address of the device", required: true, displayDuringSetup: true
-    input name: "lanDevIPPort", type: "number", title: "LAN Device IP Port", description: "Port of the device",  defaultValue: "80", displayDuringSetup: true
-    input name: "toggleTime", type: "number", title: "Toggle Time (secs)", description: "Toggle time in seconds (for toggle mode)", defaultValue: "60" ,displayDuringSetup: true
-    input name: "switchMode", type: "enum", title: "Default Switch Mode", description: "Standard or Toggle Mode", options: ["Standard","Toggle"], required: true, displayDuringSetup: true
-    input name: "tasmotaUser", type: "text", title: "Tasmota Username", description: "Username to manage the device", required: true, displayDuringSetup: true
-    input name: "tasmotaPass", type: "password", title: "Tasmota Password", description: "Username to manage the device", required: true, displayDuringSetup: true
+    section {
+      input name: "lanDevIPAddr", type: "text", title: "LAN Device IP Address", description: "IP Address of the device", required: true, displayDuringSetup: true
+      input name: "lanDevIPPort", type: "number", title: "LAN Device IP Port", description: "Port of the device",  defaultValue: "80", displayDuringSetup: true
+    }
+    section {
+      input name: "tasmotaUser", type: "text", title: "Tasmota Username", description: "Username to manage the device", required: true, displayDuringSetup: true
+      input name: "tasmotaPass", type: "password", title: "Tasmota Password", description: "Username to manage the device", required: true, displayDuringSetup: true
+    }
+    section {
+      input name: "switchMode", type: "enum", title: "Default Switch Mode", description: "Standard or Toggle Mode", options: ["Standard","Toggle"], required: true, displayDuringSetup: true
+      input name: "toggleTime", type: "number", title: "Toggle Time (secs)", description: "Toggle time in seconds (for toggle mode)", defaultValue: "60" ,displayDuringSetup: true
+    }
   }
 
   tiles (scale: 2) {
@@ -75,20 +81,20 @@ metadata {
         attributeState "turningOn", label:'Turning On', action:"deviceOff", backgroundColor:"#00a0dc", icon: "st.switches.switch.off", nextState:"turningOn"
         attributeState "turningOff", label:'Turning Off', action:"deviceOn", backgroundColor:"#ffffff", icon: "st.switches.switch.on", nextState:"turningOff"
       }
+      tileAttribute("device.wifi_info", key: "SECONDARY_CONTROL") {
+        attributeState "wifi_info", label:'${currentValue}', defaultState: true
+      }
     }
-    standardTile("toggle", "device.switch", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
+    standardTile("toggle", "device.switch", inactiveLabel: false, decoration: "flat", width: 3, height: 2) {
       state "default", label:'Toggle', action:"deviceToggle", icon:"st.Health & Wellness.health7"
     }
-    standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
+    standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 3, height: 2) {
       state "default", label:"Refresh", action:"refresh.refresh", icon:"st.secondary.refresh"
-    }
-    valueTile("wifirssi", "device.wifirssi", decoration: "flat", width: 2, height: 2) {
-      state "default", label:'${currentValue}', action:"", icon:"st.Entertainment.entertainment15"
     }
  }
 
   main(["switch"])
-  details(["switch", "toggle", "refresh", "wifirssi"])
+  details(["switch", "toggle", "refresh"])
 }
 
 def installed() {
@@ -162,12 +168,12 @@ private sendCmnd(cmnd) {
   
 def parse(description) {
   def msg = parseLanMessage(description)
-  //log.debug "TDH [parse]: msg: ${msg.json}"
+  //log.debug "TDH [parse]: msg: ${msg.body}"
 
   if (msg.status == 200) {
     if (msg.json != null) {
-      if (msg.json.StatusSTS?.Wifi?.RSSI != null) {
-        sendEvent(name: "wifirssi", value: msg.json.StatusSTS.Wifi.SSId+"\n-"+msg.json.StatusSTS.Wifi.RSSI+' dB')
+      if (msg.json.StatusSTS?.Wifi?.RSSI != null && msg.json.StatusNET?.IPAddress != null) {
+        sendEvent(name: "wifi_info", value: msg.json.StatusSTS.Wifi.SSId+' (-'+msg.json.StatusSTS.Wifi.RSSI+"dB)\n"+msg.json.StatusNET.IPAddress+"\n")
       }
       
       if (msg.json.POWER != null) {
