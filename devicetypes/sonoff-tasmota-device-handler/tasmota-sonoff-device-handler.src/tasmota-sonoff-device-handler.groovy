@@ -34,7 +34,7 @@ include 'asynchttp_v1'
 
 metadata {
   definition (
-    name: "Tasmota-Sonoff Device Handler",
+    name: "Tasmota/Sonoff Device Handler",
     namespace: "sonoff-tasmota-device-handler",
     author: "Mark Page",
     singleInstance: true,
