@@ -24,7 +24,7 @@ definition (
   version: "17.11.05.02",
   namespace: "hvac-control",
   author: "Mark Page",
-  description: "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. (17.11.05.02)",
+  description: "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON. (v19.11.24.6)",
   singleInstance: true,
   category: "SmartThings Internal",
   iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-256px.png",
@@ -40,7 +40,7 @@ def mainPage() {
   dynamicPage(name: "mainPage", title: "") {
 
     section ("HVAC Control") {
-      paragraph "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON proxy. Polls in 30 minute intervals. (v17.11.05.02)"
+      paragraph "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON server. Polls in 30 minute intervals. (v19.11.24.6)"
     }
 
     section ("Select Thermostats") {
