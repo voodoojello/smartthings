@@ -1,13 +1,13 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tasmota-Sonoff Device Handler for Sma/tThings
+//  Tasmota-Sonoff Device Handler for SmartThings
 //  Copyright (c)2019-2020 Mark Page (mark@very3.net)
 //  Modified: Thu Nov 21 21:18:56 CST 2019
 //
 //  This device handler is for ESP8266 based Sonoff Basic devices running Tasmota 6.6.0 or higher.
+//  In theory this *should* work with any single-relay ESP8266 device running Tasmota but YMMV.
 //  Devices can act as standard on/off switches or as "toggles" (on/off/on, off/on/off) with preset
 //  timers. The toggles are handy for rebooting routers, DOCSIS modems, or even the ST hub =)
-//  In theory this//should* work with any single-relay ESP8266 device running Tasmota but YMMV.
 //
 //  For more  info on Tasmota and the Sonoff Basic see:
 //
@@ -101,10 +101,18 @@ metadata {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def installed() {
+  logger('info','installed',"Installed with settings: ${settings}")
   initialize()
 }
 
 def configure() {
+  logger('info','configure',"Configured with settings: ${settings}")
+  initialize()
+}
+
+def updated() {
+  logger('info','updated',"Updated with settings: ${settings}")
+  unschedule()
   initialize()
 }
 
@@ -112,16 +120,13 @@ def refresh() {
   initialize()
 }
 
-def updated() {
-  unschedule()
-  initialize()
-}
-
 def initialize() {
+  state.logHandle   = 'TSDH'
+  state.logMode     = 0
   state.deviceState = ""
-  state.debugMode   = 0
   logger('info','initialize',"Logging set to ${state.debugMode}")
   
+  // Set time on device
   def unixEpoch = new Date().getTime()/1000
   sendCmnd("Time ${unixEpoch}")
   sendCmnd("Time 0")
@@ -138,10 +143,6 @@ def poll() {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-private getCallBackAddress() {
-  return device.hub.getDataValue("localIP")+":"+device.hub.getDataValue("localSrvPortTCP")
-}
 
 private String ipToHex(ipaddr,ipport) {
   String hexipaddr = ipaddr.tokenize('.').collect {String.format('%02X',it.toInteger())}.join()
@@ -264,9 +265,16 @@ def deviceOff() {
   logger('debug','deviceOff',"switchMode: ${switchMode}, deviceState: ${state.deviceState}, toggleTime: ${toggleTime}")
 }
 
-def logger(type,loc,msg) {
-  if (state.debugMode) {
-   log."${type}" "TSDH [${loc}]: ${msg}"
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+private logger(type,loc,msg) {
+  //
+  // type: error, warn, info, debug, trace
+  //
+  if ("${type}" == 'info') {
+    log."${type}" "${state.logHandle} [${loc}]: ${msg}"
+  }
+  else if (state.logMode > 0) {
+    log."${type}" "${state.logHandle} [${loc}]: ${msg}"
   }
 }
-
