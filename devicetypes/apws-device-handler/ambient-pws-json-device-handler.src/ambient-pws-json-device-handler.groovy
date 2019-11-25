@@ -41,6 +41,9 @@ metadata {
       capability "Temperature Measurement"
       capability "Ultraviolet Index"
       capability "Refresh"
+      capability "Thermostat Mode"
+      capability "Thermostat Cooling Setpoint"
+      capability "Thermostat Heating Setpoint"
     }
 
   simulator {
@@ -124,8 +127,8 @@ def refresh() {
 }
 
 def initialize() {
-  state.logMode   = 0
-  state.logHandle = 'APWSDH'
+  state.logMode   = 1
+  state.logHandle = 'apws-dh'
   state.pws       = [:]
   logger('info','initialize',"Logging set to ${state.debugMode}")
 
@@ -185,8 +188,10 @@ def parse(description) {
   sendEvent(name:"windgustmph", value:pwsData.pws.windgustmph, unit:"mph")
   sendEvent(name:"maxdailygust", value:pwsData.pws.maxdailygust, unit:"mph")
   sendEvent(name:"wind_composite", value: "S: ${pwsData.pws.windspeedmph} mph${spacer}G: ${pwsData.pws.windgustmph} mph${spacer}D: ${cardinalPoints[cardinalIndex.toInteger()]} (${pwsData.pws.winddir}°)")
-  
-  sendEvent(name:"battout", value:pwsData.pws.battout)
+
+  sendEvent(name:"thermostatHeatingSetpoint", value:pwsData.hvac.adj_temp)
+  sendEvent(name:"thermostatCoolingSetpoint", value:pwsData.hvac.adj_temp)
+  sendEvent(name:"thermostatMode", value:pwsData.hvac.hvac_mode)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
