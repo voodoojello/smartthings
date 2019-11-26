@@ -2,11 +2,10 @@
 //
 //  Ambient HVAC Control for SmartThings
 //  Copyright (c)2019-2020 Mark Page (mark@very3.net)
-//  Modified: Sun Nov 24 08:28:56 CST 2019
+//  Modified: Tue Nov 26 9:11:21 CST 2019
 //
-//  Control HVAC based via published capabilities of the very3 Ambient PWS Device Handler.
-//
-//      https://github.com/voodoojello/smartthings/tree/master/devicetypes/apws-device-handler
+//  Control HVAC based via published capabilities of the very3 Ambient PWS Device Handler. For more
+//  information see: https://github.com/voodoojello/smartthings/tree/master/devicetypes/apws-device-handler
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at:
@@ -21,7 +20,7 @@
 
 definition (
   name: "HVAC Control",
-  version: "19.11.24.6",
+  version: "19.11.25.16",
   namespace: "hvac-control",
   author: "Mark Page",
   description: "Control HVAC based via published capabilities of the very3 Ambient PWS Device Handler",
@@ -40,17 +39,16 @@ def mainPage() {
   dynamicPage(name: "mainPage", title: "") {
 
     section ("HVAC Control") {
-      paragraph "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON server. Polls in 30 minute intervals. (v19.11.24.6)"
+      paragraph "Control HVAC based on presence and various climate levels from the very3 Ambient PWS JSON server."
     }
 
     section ("Select Thermostats") {
       input "thermostats", "capability.thermostat", title: "Select thermostats:", multiple: true, required: true
     }
     
-    section ("Select Thermostat Setpoint Source") {
-      input "thermostatModeValue", "capability.thermostatMode", title: "Mode Source:", required: true
-      input "thermostatCoolingSetpointValue", "capability.thermostatCoolingSetpoint", title: "Cooling Setpoint Source:", required: true
-      input "thermostatHeatingSetpointValue", "capability.thermostatHeatingSetpoint", title: "Heating Setpoint Source:", required: true
+    section ("Select Weather Source") {
+      input "temperatureValue", "capability.temperatureMeasurement", title: "Outside Temperature Source:", required: true
+      input "humidityValue", "capability.relativeHumidityMeasurement", title: "Outside Humidity Source:", required: true
     }
 
     section ("Day/Night Temperature Presets") {
@@ -58,11 +56,6 @@ def mainPage() {
       input "nightCool", "decimal", title: "Night cooling temperature:", required: true
       input "dayHeat", "decimal", title: "Day heating temperature:", required: true
       input "nightHeat", "decimal", title: "Night heating temperature:", required: true
-    }
-
-    section ("Night Start/Stop") {
-      input "nightStart", "time", title: "Night cycle starts at hour:", required: true
-      input "nightStop", "time", title: "Night cycle stops at hour:", required: true
     }
 
     section ("Heating/Cooling Changeover Temperatures") {
@@ -75,20 +68,19 @@ def mainPage() {
 	  input "awayHeatTemp", "number", title: "Default away heating temperature:", multiple: false, required: true
     }
 
+    section ("Night Start/Stop") {
+      input "nightStart", "time", title: "Night cycle starts at hour:", required: true
+      input "nightStop", "time", title: "Night cycle stops at hour:", required: true
+    }
+
     section ("Virtual Hold Switch for Override") {
       input "thermHoldSwitch", "capability.switch", required: true, title: "Choose the virtual hold switch:"
     }
-
-    section ("Application Authentication Key") {
-      input "appKey", "text", title: "Numbers or text, 8 character minimum:", multiple: false, required: true
-    }
     
-    section ("Advanced: Comfort Calculation Tweaks") {
-      paragraph title: "Warning!", "Setting these values out of range from the assigned defaults can have disasterous effects. Don't change these values without thoroughly testing. Safe tweak ranges for temperature are .1 to .5. Safe tweak ranges for humidity are .001 to .008."
-      input "tweakTemp", "decimal", title: "Tweak temperature:", required: true, defaultValue:0.3
-      input "tweakHumi", "decimal", title: "Tweak humidity:", required: true, defaultValue:0.001
+    section ("Humidity Scaling Factor") {
+      paragraph "This setting scales thermostat values according to outdoor humidity changes. Safe ranges for humidity scaling are .001 to .008."
+      input "humidityAdjust", "decimal", title: "Humidity Scaling:", required: true, defaultValue:0.001
     }
-
   }
 }
 
@@ -101,17 +93,6 @@ def installed() {
 
 def updated() {
   logger('info','updated',"Updated with settings: ${settings}")
-  
-  def getURL  = "https://pws.very3.net/?_k="+appKey+"&_dc="+dayCool+"&_nc="+nightCool+"&_dh="+dayHeat+"&_nh="+nightHeat+"&_ct="+modeThresCool+"&_ht="+modeThresHeat+"&_nb="+nightStart+"+&_ne="+nightStop+"&_tt="+tweakTemp+"&_th="+tweakHumi
-  logger('debug','updated',"[getURL] ${getURL}")
-  def pwsData = updateServer(getURL)
-  
-  logger('trace','updated',"PWS night_mode: ${pwsData.hvac.nightmode}")
-  logger('trace','updated',"PWS set_temp: ${pwsData.hvac.set_temp}")
-  logger('trace','updated',"PWS adj_temp: ${pwsData.hvac.adj_temp}")
-  logger('trace','updated',"PWS diff_temp: ${pwsData.hvac.diff_temp}")
-  logger('trace','updated',"PWS apdiff_temp: ${pwsData.hvac.apdiff_temp}")
-  logger('trace','updated',"PWS hvac_mode: ${pwsData.hvac.hvac_mode}")
  
   unsubscribe()
   initialize()
@@ -130,81 +111,107 @@ def initialize() {
 def poll() {
   logger('info','poll',"Starting...")
   
-  def hvac_mode = thermostatModeValue.latestValue("thermostatMode")
-  def currMode  = location.mode
-  def adj_temp  = ''
-  
-  if (hvac_mode == "heat" && thermHoldSwitch.currentSwitch == 'off') {
-  	adj_temp = thermostatHeatingSetpointValue.latestValue("thermostatHeatingSetpoint")
-    
-    if (currMode.toLowerCase() == "away") {
-      adj_temp = awayHeatTemp
-    }
-    
-    thermostats.heat()
-    thermostats.fanAuto()
-    thermostats.setHeatingSetpoint(adj_temp)
-  }
-  
-  if (hvac_mode == "cool" && thermHoldSwitch.currentSwitch == 'off') {
-  	adj_temp = thermostatHeatingSetpointValue.latestValue("thermostatCoolingSetpoint")
-    
-    if (currMode.toLowerCase() == "away") {
-      adj_temp = awayCoolTemp
-    }
-    
-    thermostats.cool()
-    thermostats.fanAuto()
-    thermostats.setCoolingSetpoint(adj_temp)
-  }
-  
-  logger('debug','poll',"hvac_mode: ${hvac_mode}, adj_temp: ${adj_temp}, currMode: ${currMode}, thermHoldSwitch: ${thermHoldSwitch.currentSwitch}")
+  def adjTemp     = 72
+  def hvacMode    = 'off'
+  def currMode    = location.mode
+  def isNight     = timeOfDayIsBetween(nightStart, nightStop, new Date(), location.timeZone)
+  def osTemp      = (temperatureValue.latestValue("temperatureMeasurement") as BigDecimal)
+  def osHumi      = (humidityValue.latestValue("relativeHumidityMeasurement") as BigDecimal)
+  def feelsLike   = (temperatureValue.latestValue("feelsLikeTemp") as BigDecimal)
+  def windSpeed   = (temperatureValue.latestValue("windSpeed") as BigDecimal)
+  def dewPoint    = (temperatureValue.latestValue("dewPoint") as BigDecimal)
+  def absPressure = (temperatureValue.latestValue("absoluteBarometricPressure") as BigDecimal)
+  def relPressure = (temperatureValue.latestValue("relativeBarometricPressure") as BigDecimal)
 
-  if (thermHoldSwitch.currentSwitch == 'on') {
+  if (osTemp >= modeThresCool) {
+    hvacMode = 'cool'
+  }
+
+  if (osTemp <= modeThresHeat) {
+    hvacMode = 'heat'
+  }
+
+  logger('debug','poll',"osTemp: ${osTemp}, osHumi: ${osHumi}, feelsLike: ${feelsLike}, windSpeed: ${windSpeed}, dewPoint: ${dewPoint}, absPressure: ${absPressure}, relPressure: ${relPressure}, modeThresHeat: ${modeThresHeat}, modeThresCool: ${modeThresCool}, hvacMode: ${hvacMode}")
+  
+  if (thermHoldSwitch.currentSwitch == 'off') {
+  	if (hvacMode == "heat") {
+      adjTemp = adjustTemp(dayHeat,osTemp,feelsLike,osHumi)
+      
+      if (isNight) {
+        adjTemp = adjustTemp(nightHeat,osTemp,feelsLike,osHumi)
+      }
+      
+      if (currMode.toLowerCase() == "away") {
+        adjTemp = awayHeatTemp
+      }
+    
+      thermostats.heat()
+      thermostats.fanAuto()
+      thermostats.setHeatingSetpoint(adjTemp)
+    }
+  
+    if (hvacMode == "cool") {
+      adjTemp = adjustTemp(dayCool,osTemp,feelsLike,osHumi)
+
+      if (isNight) {
+        adjTemp = adjustTemp(nightCool,osTemp,feelsLike,osHumi)
+      }
+
+      if (currMode.toLowerCase() == "away") {
+        adjTemp = awayCoolTemp
+      }
+    
+      thermostats.cool()
+      thermostats.fanAuto()
+      thermostats.setCoolingSetpoint(adjTemp)
+    }
+
+    if (hvacMode == "off") {
+      thermostats.off()
+    }
+
+    sendNotificationEvent("${state.logHandle}: Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
+    logger('info','poll',"Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
+  }
+  else {
     sendNotificationEvent("${state.logHandle}: thermHoldSwitch is ON, no action taken.")
     logger('info','poll',"thermHoldSwitch is ON, no action taken.")
   }
-  else {
-    sendNotificationEvent("${state.logHandle}: Set HVAC mode to ${hvac_mode}, set temperature to ${adj_temp}")
-    logger('info','poll',"Set HVAC mode to ${hvac_mode}, set temperature to ${adj_temp}")
-  }
+  
+  logger('debug','poll',"hvacMode: ${hvacMode}, adjTemp: ${adjTemp}, currMode: ${currMode}, isNight: ${isNight}, thermHoldSwitch: ${thermHoldSwitch.currentSwitch}")
 
-  logger('debug','poll',"[Device Handler] thermostatModeValue: ${thermostatModeValue.latestValue("thermostatMode")}")
-  logger('debug','poll',"[Device Handler] thermostatCoolingSetpointValue: ${thermostatCoolingSetpointValue.latestValue("thermostatCoolingSetpoint")}")
-  logger('debug','poll',"[Device Handler] thermostatHeatingSetpointValue: ${thermostatHeatingSetpointValue.latestValue("thermostatHeatingSetpoint")}")
-
-  logger('debug','poll',"[${thermostats[0].label}] latestTempValue: ${thermostats[0].latestValue("temperature")}")
-  logger('debug','poll',"[${thermostats[0].label}] latestModeValue: ${thermostats[0].latestValue("thermostatMode")}")
-  logger('debug','poll',"[${thermostats[0].label}] latestCoolingSetPoint: ${thermostats[0].latestValue("coolingSetpoint")}")
-
-  logger('debug','poll',"[${thermostats[1].label}] latestTempValue: ${thermostats[1].latestValue("temperature")}")
-  logger('debug','poll',"[${thermostats[1].label}] latestModeValue: ${thermostats[1].latestValue("thermostatMode")}")
-  logger('debug','poll',"[${thermostats[1].label}] latestHeatingSetPoint: ${thermostats[1].latestValue("heatingSetpoint")}")
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-def updateServer(pushURI) {
-  def params = [
-    uri: pushURI,
-    format: 'json',
-    contentType: 'application/json'
-  ]
-
-  try {
-    httpGet(params) { response ->
-      logger('info','updateServer',"httpGet (OK)")
-      logger('debug','updateServer',"${response.data}")
-      return response.data
-    }
-  }
-  catch (e) {
-    logger('error','updateServer',"httpGet (ERROR: ${e})")
-    return "ERROR: $e"
+  thermostats.each {
+    logger('debug','poll',"[${it.label}] latestTempValue: ${it.latestValue("temperature")}")
+    logger('debug','poll',"[${it.label}] latestModeValue: ${it.latestValue("thermostatMode")}")
+    logger('debug','poll',"[${it.label}] latestCoolingSetPoint: ${it.latestValue("coolingSetpoint")}")
+    logger('debug','poll',"[${it.label}] latestCoolingSetPoint: ${it.latestValue("heatingSetpoint")}")
   }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+private adjustTemp(setTemp,osTemp,feelsLike,humidity) {
+  def ret
+  def difTemp = 0
+  
+  if (feelsLike >= osTemp) {
+    difTemp = osTemp - (osTemp - (humidity * humidityAdjust));
+    ret = (setTemp - difTemp)
+  }
+  
+  if (feelsLike <= osTemp) {
+    difTemp = osTemp - (osTemp + (humidity * humidityAdjust));
+    ret = (setTemp - difTemp)
+  }
+  
+  logger('info','adjustTemp',"setTemp: ${setTemp}, difTemp: ${difTemp}, return: ${ret}, osTemp: ${osTemp}, feelsLike: ${feelsLike}, humidity: ${humidity}")
+  return round(ret,1)
+}
+
+private static double round(double value, int precision) {
+  int scale = (int) Math.pow(10,precision)
+  return (double) Math.round(value*scale)/scale
+}
 
 private logger(type,loc,msg) {
   // type: error, warn, info, debug, trace
