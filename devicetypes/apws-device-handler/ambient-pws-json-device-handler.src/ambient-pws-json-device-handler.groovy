@@ -41,9 +41,12 @@ metadata {
       capability "Temperature Measurement"
       capability "Ultraviolet Index"
       capability "Refresh"
-      capability "Thermostat Mode"
-      capability "Thermostat Cooling Setpoint"
-      capability "Thermostat Heating Setpoint"
+      
+      attribute "feelsLikeTemp", "number"
+      attribute "dewPoint", "number"
+      attribute "windSpeed", "number"
+      attribute "relativeBarometricPressure", "number"
+      attribute "absoluteBarometricPressure", "number"
     }
 
   simulator {
@@ -189,9 +192,13 @@ def parse(description) {
   sendEvent(name:"maxdailygust", value:pwsData.pws.maxdailygust, unit:"mph")
   sendEvent(name:"wind_composite", value: "S: ${pwsData.pws.windspeedmph} mph${spacer}G: ${pwsData.pws.windgustmph} mph${spacer}D: ${cardinalPoints[cardinalIndex.toInteger()]} (${pwsData.pws.winddir}°)")
 
-  sendEvent(name:"thermostatHeatingSetpoint", value:pwsData.hvac.adj_temp)
-  sendEvent(name:"thermostatCoolingSetpoint", value:pwsData.hvac.adj_temp)
-  sendEvent(name:"thermostatMode", value:pwsData.hvac.hvac_mode)
+  sendEvent(name:"relativeHumidityMeasurement", value:pwsData.pws.humidity)
+  sendEvent(name:"temperatureMeasurement", value:pwsData.pws.tempf)
+  sendEvent(name:"absoluteBarometricPressure", value:pwsData.pws.baromabsin)
+  sendEvent(name:"relativeBarometricPressure", value:pwsData.pws.baromrelin)
+  sendEvent(name:"windSpeed", value:pwsData.pws.windspeedmph)
+  sendEvent(name:"dewPoint", value:pwsData.pws.dewPoint)
+  sendEvent(name:"feelsLikeTemp", value:pwsData.pws.feelsLike)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
