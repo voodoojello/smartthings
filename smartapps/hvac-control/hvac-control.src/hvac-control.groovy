@@ -170,25 +170,61 @@ def poll() {
       thermostats.off()
     }
 
-    sendNotificationEvent("${state.logHandle}: Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
-    logger('info','poll',"Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
+	if (hasChange(hvacMode,adjTemp)) {
+      sendNotificationEvent("${state.logHandle}: Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
+      logger('info','poll',"Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
+    }
   }
   else {
-    sendNotificationEvent("${state.logHandle}: thermHoldSwitch is ON, no action taken.")
-    logger('info','poll',"thermHoldSwitch is ON, no action taken.")
+	if (hasChange(hvacMode,adjTemp)) {
+      sendNotificationEvent("${state.logHandle}: thermHoldSwitch is ON, no action taken.")
+      logger('info','poll',"thermHoldSwitch is ON, no action taken.")
+    }
   }
   
   logger('debug','poll',"hvacMode: ${hvacMode}, adjTemp: ${adjTemp}, currMode: ${currMode}, isNight: ${isNight}, thermHoldSwitch: ${thermHoldSwitch.currentSwitch}")
-
-  thermostats.each {
-    logger('debug','poll',"[${it.label}] latestTempValue: ${it.latestValue("temperature")}")
-    logger('debug','poll',"[${it.label}] latestModeValue: ${it.latestValue("thermostatMode")}")
-    logger('debug','poll',"[${it.label}] latestCoolingSetPoint: ${it.latestValue("coolingSetpoint")}")
-    logger('debug','poll',"[${it.label}] latestCoolingSetPoint: ${it.latestValue("heatingSetpoint")}")
-  }
+  logger('debug','poll',getThermStates())
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+private hasChange(mode,adjTemp) {
+  def ret = false
+  def currentState = getThermStates()
+  
+  currentState.each {
+  	if (adjTemp.round() != it.value.temperature) {
+      ret = true
+    }
+  	if (mode != it.value.thermostatMode) {
+      ret = true
+    }
+  }
+  
+  logger('debug','hasChange',"mode: ${mode}, adjTemp: ${adjTemp}, return: ${ret}")
+  
+  return ret
+}
+
+private getThermStates() {
+  def ret = [:]
+
+  thermostats.each {
+    def key   = "${it.label}"
+  	def inner = [:]
+    
+    inner.thermostatOperatingState = it.currentValue("thermostatOperatingState")
+    inner.temperature              = it.currentValue("temperature")
+    inner.thermostatMode           = it.currentValue("thermostatMode")
+    inner.thermostatFanMode        = it.currentValue("thermostatFanMode")
+    inner.coolingSetpoint          = it.currentValue("coolingSetpoint")
+    inner.heatingSetpoint          = it.currentValue("heatingSetpoint")
+    
+    ret.put((key),inner)
+  }
+  
+  return ret
+}
 
 private adjustTemp(setTemp,osTemp,feelsLike,humidity) {
   def ret
