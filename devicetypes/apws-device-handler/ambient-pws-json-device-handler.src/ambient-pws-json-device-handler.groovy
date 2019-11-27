@@ -2,7 +2,7 @@
 //
 //  Ambient PWS JSON Device Handler for SmartThings
 //  Copyright (c)2019-2020 Mark Page (mark@very3.net)
-//  Modified: Sun Nov 24 08:28:56 CST 2019
+//  Modified: Wed Nov 27 05:07:21 CST 2019
 //
 //  This device handler is for the Ambient Weather Station and depends on a JSON source to pull data
 //  from the Ambient Weather API and/or a METAR source. This script is available at:
@@ -45,8 +45,14 @@ metadata {
       attribute "feelsLikeTemp", "number"
       attribute "dewPoint", "number"
       attribute "windSpeed", "number"
+      attribute "windDirectionCardinal", "string"
+      attribute "windDirectionDegrees", "number"
       attribute "relativeBarometricPressure", "number"
       attribute "absoluteBarometricPressure", "number"
+      attribute "sunRise", "date"
+      attribute "sunSet", "date"
+      attribute "cloudCover", "string"
+      attribute "visibility", "string"
     }
 
   simulator {
@@ -79,31 +85,35 @@ metadata {
     }
 
     valueTile("uv_composite", "device.uv_composite", decoration:"flat", width:6, height:2, wordWrap:false, backgroundColor:"#ff0000") {
-      state "default", label:'${currentValue}', icon:"st.Weather.weather14"
+      state "val", label:'${currentValue}', icon:"st.Weather.weather14"
     }
 
     valueTile("humidity_composite", "device.humidity_composite", decoration:"flat", width:6, height:2, wordWrap:false) {
-      state "default", label:'${currentValue}', icon:"st.Weather.weather2"
+      state "val", label:'${currentValue}', icon:"st.Weather.weather2"
     }
 
     valueTile("pressure_composite", "device.pressure_composite", decoration:"flat", width:6, height:2, wordWrap:false) {
-      state "default", label:'${currentValue}', icon:"st.Weather.weather2"
+      state "val", label:'${currentValue}', icon:"st.Weather.weather2"
     }
 
     valueTile("wind_composite", "device.wind_composite", decoration:"flat", width:6, height:2, wordWrap:false) {
-      state "default", label:'${currentValue}', icon:"st.Weather.weather1"
+      state "val", label:'${currentValue}', icon:"st.Weather.weather1"
     }
 
     valueTile("rain_composite", "device.rain_composite", decoration:"flat", width:6, height:2, wordWrap:false) {
-      state "default", label:'${currentValue}', icon:"st.Weather.weather10"
+      state "val", label:'${currentValue}', icon:"st.Weather.weather10"
+    }
+
+    valueTile("cloud_composite", "device.cloud_composite", decoration:"flat", width:6, height:2, wordWrap:false) {
+      state "val", label:'${currentValue}', icon:"st.custom.wu1.nt_cloudy"
     }
 
     standardTile("updated", "device.updated", decoration:"flat", width:6, height:2, wordWrap:false) {
-      state "default", label:'Updated: ${currentValue}', action:"refresh.refresh", icon:"st.Health & Wellness.health7"
+      state "val", label:'Updated: ${currentValue}', action:"refresh.refresh", icon:"st.Health & Wellness.health7"
     }
 
     main(["temperature"])
-    details(["temperature","uv_composite","humidity_composite","pressure_composite","wind_composite","rain_composite","updated","refresh"])
+    details(["temperature","uv_composite","humidity_composite","pressure_composite","wind_composite","rain_composite","cloud_composite","updated","refresh"])
   }
 }
 
@@ -156,49 +166,30 @@ def parse(description) {
   
   logger('trace','parse',"pwsData: ${pwsData}")
 
-  sendEvent(name:"temperature", value:pwsData.pws.tempf, unit:"F")
-  sendEvent(name:"ultravioletIndex", value:pwsData.pws.uv)
-  sendEvent(name:"illuminance", value:pwsData.pws.solarradiation, unit:"lux")
-  sendEvent(name:"humidity", value:pwsData.pws.humidity, unit:"%")
-  sendEvent(name:"updated", value: pwsData.app.updated_long)
-
-  sendEvent(name:"tempf", value:pwsData.pws.tempf, unit:"F")
-  sendEvent(name:"feelsLike", value:pwsData.pws.feelsLike, unit:"F")
   sendEvent(name:"temp_composite", value:"Feels Like: ${pwsData.pws.feelsLike}°F")
-
-  sendEvent(name:"solarradiation", value:pwsData.pws.solarradiation)
-  sendEvent(name:"uv", value:pwsData.pws.uv)
   sendEvent(name:"uv_composite", value:"SR: ${pwsData.pws.solarradiation} w/m2${spacer}UVI: ${pwsData.pws.uv}")
-  
-  sendEvent(name:"dewPoint", value:pwsData.pws.dewPoint, unit:"F")
-  sendEvent(name:"humidity", value:pwsData.pws.humidity, unit:"%")
+  sendEvent(name:"cloud_composite", value:"Clouds: ${pwsData.metar.sky_condition}${spacer}Visibility: ${pwsData.metar.visibility_statute_mi} mi")
   sendEvent(name:"humidity_composite", value: "Humidity: ${pwsData.pws.humidity}%${spacer}Dewpoint: ${pwsData.pws.dewPoint}°F")
-  
-  sendEvent(name:"baromabsin", value:pwsData.pws.baromabsin, unit:"in")
-  sendEvent(name:"baromrelin", value:pwsData.pws.baromrelin, unit:"in")
   sendEvent(name:"pressure_composite", value: "ABSP: ${pwsData.pws.baromabsin} inMg${spacer}RELP: ${pwsData.pws.baromrelin} inMg")
-
-  sendEvent(name:"hourlyrainin", value:pwsData.pws.hourlyrainin, unit:"in")
-  sendEvent(name:"dailyrainin", value:pwsData.pws.dailyrainin, unit:"in")
-  sendEvent(name:"weeklyrainin", value:pwsData.pws.weeklyrainin, unit:"in")
-  sendEvent(name:"monthlyrainin", value:pwsData.pws.monthlyrainin, unit:"in")
-  sendEvent(name:"yearlyrainin", value:pwsData.pws.yearlyrainin, unit:"in")
-  sendEvent(name:"totalrainin", value:pwsData.pws.totalrainin, unit:"in")
   sendEvent(name:"rain_composite", value: "D: ${pwsData.pws.dailyrainin}\"${spacer}W: ${pwsData.pws.weeklyrainin}\"${spacer}M: ${pwsData.pws.monthlyrainin}\"${spacer}Y: ${pwsData.pws.totalrainin}\"")
-  
-  sendEvent(name:"winddir", value:pwsData.pws.winddir, unit:"dir")
-  sendEvent(name:"windspeedmph", value:pwsData.pws.windspeedmph, unit:"mph")
-  sendEvent(name:"windgustmph", value:pwsData.pws.windgustmph, unit:"mph")
-  sendEvent(name:"maxdailygust", value:pwsData.pws.maxdailygust, unit:"mph")
   sendEvent(name:"wind_composite", value: "S: ${pwsData.pws.windspeedmph} mph${spacer}G: ${pwsData.pws.windgustmph} mph${spacer}D: ${cardinalPoints[cardinalIndex.toInteger()]} (${pwsData.pws.winddir}°)")
+  sendEvent(name:"updated", value: pwsData.app.updated_long)
 
   sendEvent(name:"relativeHumidityMeasurement", value:pwsData.pws.humidity)
   sendEvent(name:"temperatureMeasurement", value:pwsData.pws.tempf)
+  sendEvent(name:"illuminanceMeasurement", value:pwsData.pws.solarradiation)
+  sendEvent(name:"ultravioletIndex", value:pwsData.pws.uv)
   sendEvent(name:"absoluteBarometricPressure", value:pwsData.pws.baromabsin)
   sendEvent(name:"relativeBarometricPressure", value:pwsData.pws.baromrelin)
   sendEvent(name:"windSpeed", value:pwsData.pws.windspeedmph)
+  sendEvent(name:"windDirectionCardinal", value:cardinalPoints[cardinalIndex.toInteger()])
+  sendEvent(name:"windDirectionDegrees", value:pwsData.pws.winddir)
   sendEvent(name:"dewPoint", value:pwsData.pws.dewPoint)
   sendEvent(name:"feelsLikeTemp", value:pwsData.pws.feelsLike)
+  sendEvent(name:"sunRise", value:pwsData.pws.sunrise)
+  sendEvent(name:"sunSet", value:pwsData.pws.sunset)
+  sendEvent(name:"cloudCover", value:pwsData.metar.sky_condition)
+  sendEvent(name:"visibility", value:pwsData.metar.visibility)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
