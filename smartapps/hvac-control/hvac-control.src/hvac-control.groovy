@@ -74,12 +74,17 @@ def mainPage() {
     }
 
     section ("Enable / Disable HVAC Control") {
-      input("hvaccEnable", "enum", title: "Enable / Disable HVACC Control", options: ["Enable","Disable"])
+      input("hvaccEnable", "enum", title: "Enable / Disable HVACC Control", options: ["Enable","Disable"], defaultValue:"Enable")
     }
     
-    section ("Humidity Scaling Factor") {
-      paragraph "This setting scales thermostat values according to outdoor humidity changes. Safe ranges for humidity scaling are .001 to .008."
-      input "humidityAdjust", "decimal", title: "Humidity Scaling:", required: true, defaultValue:0.001
+    section ("Humidity Scaling") {
+      paragraph "Inversely scale thermostat set values by humidity changes for comfort. Higher values make it cooler or warmer. Sane ranges for humidity scaling are .001 to .008."
+      input ("humidityAdjust", "decimal", title: "Humidity Scaling:", required: true, defaultValue:0.001)
+    }
+    
+    section ("Change Threshold") {
+      paragraph "Minimum set temperature change required to trigger thermostat update. Sane ranges for humidity scaling are 0.0 (always) to 1.0."
+      input ("changeThreshold", "decimal", title: "Change Threshold:", required: true, defaultValue:0.5)
     }
   }
 }
@@ -88,7 +93,6 @@ def mainPage() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def installed() {
-  logger('info','installed',"Installed with settings: ${settings}")
   initialize()
 }
 
@@ -100,8 +104,8 @@ def updated() {
 }
 
 def initialize() {
+  state.logMode   = 1
   state.shmStatus = 'off'
-  state.logMode   = 0
   state.logHandle = 'HVACC'
   
   subscribe(location, "alarmSystemStatus" , shmHandler)
@@ -161,9 +165,14 @@ def poll() {
         adjTemp = awayHeatTemp
       }
     
-      thermostats.heat()
-      thermostats.fanAuto()
-      thermostats.setHeatingSetpoint(adjTemp)
+      if (hasChange(hvacMode,adjTemp)) {
+        thermostats.heat()
+        thermostats.fanAuto()
+        thermostats.setHeatingSetpoint(adjTemp)
+        
+        sendNotificationEvent("${state.logHandle}: Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp} (osTemp: ${osTemp}, feelsLike: ${feelsLike}, osHumi ${osHumi})")
+        logger('info','poll',"Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
+      }
     }
   
     if (hvacMode == "cool") {
@@ -177,21 +186,30 @@ def poll() {
         adjTemp = awayCoolTemp
       }
     
-      thermostats.cool()
-      thermostats.fanAuto()
-      thermostats.setCoolingSetpoint(adjTemp)
+      if (hasChange(hvacMode,adjTemp)) {
+        thermostats.cool()
+        thermostats.fanAuto()
+        thermostats.setCoolingSetpoint(adjTemp)
+        
+        sendNotificationEvent("${state.logHandle}: Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp} (osTemp: ${osTemp}, feelsLike: ${feelsLike}, osHumi ${osHumi})")
+        logger('info','poll',"Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
+      }
     }
 
     if (hvacMode == "off") {
-      thermostats.off()
+      if (hasChange(hvacMode,adjTemp)) {
+        thermostats.off()
+        
+        sendNotificationEvent("${state.logHandle}: Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp} (osTemp: ${osTemp}, feelsLike: ${feelsLike}, osHumi ${osHumi})")
+        logger('info','poll',"Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
+      }
     }
-
-    sendNotificationEvent("${state.logHandle}: Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp} (osTemp: ${osTemp}, feelsLike: ${feelsLike}, osHumi ${osHumi})")
-    logger('info','poll',"Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
   }
   else {
-    sendNotificationEvent("${state.logHandle}: Override is ${hvaccEnable}, no action taken.")
-    logger('info','poll',"Override is ${hvaccEnable}, no action taken.")
+    if (hasChange(hvacMode,adjTemp)) {
+      sendNotificationEvent("${state.logHandle}: Override is ${hvaccEnable}, no action taken.")
+      logger('info','poll',"Override is ${hvaccEnable}, no action taken.")
+    }
   }
   
   logger('debug','poll',"hvacMode: ${hvacMode}, adjTemp: ${adjTemp}, currMode: ${currMode}, isNight: ${isNight}, hvaccEnable: ${hvaccEnable}")
@@ -209,26 +227,37 @@ private hasChange(hvacMode,adjTemp) {
 
   currentState.each {
     def thisReturn  = false
+    def thisChange  = "none"
+    
     currentSetTemp  = round(it.value.temperature,2)
     currentHvacMode = it.value.thermostatMode
     
-  	if (currentAdjTemp != currentSetTemp) {
-      thisReturn  = true
-      stateReturn = true
-    }
-  	if (hvacMode != currentHvacMode) {
+  	if ((currentAdjTemp - currentSetTemp) > changeThreshold) {
+      thisChange  = (currentAdjTemp - currentSetTemp)
       thisReturn  = true
       stateReturn = true
     }
     
-    logger('debug','hasChange',"thermostatName: ${it.value.thermostatName}, hvacMode: ${hvacMode} (${currentHvacMode}), adjTemp: ${currentAdjTemp} (${currentSetTemp}), thisReturn: ${thisReturn}, stateReturn: ${stateReturn}")
+  	if ((currentSetTemp - currentAdjTemp) > changeThreshold) {
+      thisChange  = (currentSetTemp - currentAdjTemp)
+      thisReturn  = true
+      stateReturn = true
+    }
+    
+  	if (hvacMode != currentHvacMode) {
+      thisChange  = 'hvacMode'
+      thisReturn  = true
+      stateReturn = true
+    }
+    
+    logger('debug','hasChange',"thermostatName: ${it.value.thermostatName}, hvacMode: ${hvacMode} (${currentHvacMode}), adjTemp: ${currentAdjTemp} (${currentSetTemp}), thisChange: ${thisChange}, changeThreshold ${changeThreshold}, thisReturn: ${thisReturn}, stateReturn: ${stateReturn}")
   }
     
   return stateReturn
 }
 
 private getThermStates() {
-  def ret = [:]
+  def funcReturn = [:]
 
   thermostats.each {
     def key   = "${it.label}"
@@ -244,10 +273,10 @@ private getThermStates() {
     
     logger('debug','getThermStates',inner)
     
-    ret.put((key),inner)
+    funcReturn.put((key),inner)
   }
   
-  return ret
+  return funcReturn
 }
 
 private adjustTemp(setTemp,osTemp,feelsLike,humidity) {

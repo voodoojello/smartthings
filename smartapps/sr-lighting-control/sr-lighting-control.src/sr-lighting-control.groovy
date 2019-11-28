@@ -1,30 +1,31 @@
-/**
- *
- * ============================================
- *  PWS JSON Proxy - SR Lighting Control
- * ============================================
- *
- *  Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS JSON proxy
- *
- *  Copyright (c)2017 Mark Page (mark@very3.net)
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- *  in compliance with the License. You may obtain a copy of the License at:
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
- *  for the specific language governing permissions and limitations under the License.
- *
- */
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Illuminance (solar radiation) Device Control for SmartThings
+//  Copyright (c)2019-2020 Mark Page (mark@very3.net)
+//  Modified: Thu Nov 28 9:11:21 CST 2019
+//
+//  Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS
+//  Device Handler. For more information see:
+//
+//      https://github.com/voodoojello/smartthings/tree/master/devicetypes/apws-device-handler
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at:
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software distributed under the License is
+//  distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and limitations under the License.
+//
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 definition (
   name: "SR Lighting Control",
-  version: "17.10.29.1a",
+  version: "19.11.28.9",
   namespace: "sr-lighting-control",
   author: "Mark Page",
-  description: "Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS JSON proxy. (17.10.29.1a)",
+  description: "Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS Device Handler",
   singleInstance: false,
   category: "SmartThings Internal",
   iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-256px.png",
@@ -42,7 +43,11 @@ def mainPage() {
     actions.sort()
 
     section ("SR Lighting Control") {
-      paragraph "Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS JSON proxy. Polls in 5 minute intervals. Note: light levels are based on watts per square meter, not lumens."
+      paragraph "Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS Device Handler."
+    }
+
+    section ("Select Illuminance Source") {
+      input ("illuminanceValue", "capability.illuminanceMeasurement", title: "Illuminance Measurement Source:", required: true)
     }
 
     section ("Setting for low-light conditions") {
@@ -72,36 +77,62 @@ def mainPage() {
   }
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 def installed() {
   initialize()
 }
 
 def updated() {
+  logger('info','updated',"Updated with settings: ${settings}")
   unsubscribe()
+  unschedule()
   initialize()
 }
 
 def initialize() {
-  state.isLowSet = false
-  state.isHighSet = false
-  state.lastRun = 'never'
+  state.logMode     = 1
+  state.shmStatus   = 'off'
+  state.logHandle   = 'SRLC'
+  
+  state.isLowSet    = false
+  state.isHighSet   = false
+  state.lastRun     = 'never'
+  state.illuminance = 0
 
-  mainRouter()
-  runEvery5Minutes(mainRouter)
+  subscribe(illuminanceValue, "illuminanceMeasurement" , illuminanceHandler)
+  subscribe(location, "alarmSystemStatus" , shmHandler)
+  
+  poll()
 }
 
-def mainRouter() {
-  log.info "SRLC: Starting..."
-  def pwsData = fetchJSON("https://pws.very3.net")
+def illuminanceHandler(evt) {
+  logger('info','illuminanceHandler',"Illuminance Measurement ${evt.name} changed from ${state.illuminance} to ${evt.value}")
+  state.illuminance = evt.value
+  poll()
+}
+
+def shmHandler(evt) {
+  logger('info','shmHandler',"Smart Home Monitor ${evt.name} changed from ${state.shmStatus} to ${evt.value}")
+  state.shmStatus = evt.value
+  poll()
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+def poll() {
+  logger('info','poll',"Starting...")
 
   def tz = location.timeZone
-  def dontStartLowTime = timeToday(dontRunLowBefore,tz)
+  def dontStartLowTime  = timeToday(dontRunLowBefore,tz)
   def dontStartHighTime = timeToday(dontRunHighBefore,tz)
+  
+  BigDecimal illuminanceLevel = new BigDecimal(state.illuminance)
 
   // High Light Conditions and Actions
-  if (pwsData.pws.solarradiation >= srStartHighLevel && pwsData.pws.solarradiation >= srStopLevel && now() >= dontStartHighTime.time && location.mode != dontRunHighMode) {
+  if (illuminanceLevel >= srStartHighLevel && illuminanceLevel >= srStopLevel && now() >= dontStartHighTime.time && location.mode != dontRunHighMode) {
     if (state.isHighSet == false) {
-      def srHighMsg = "SRLC HIGH (${pwsData.pws.solarradiation}):\n"
+      def srHighMsg = "${state.logHandle} HIGH (${illuminanceLevel}):\n"
       
       if (srHighOffDevices != null) {
         srHighOffDevices.off()
@@ -125,7 +156,8 @@ def mainRouter() {
 
       state.isHighSet = true
       state.lastRun = now()
-      log.info $srHighMsg
+      
+      logger('info','poll',"${srHighMsg}")
       sendNotificationEvent("${srHighMsg}")
     }
   }
@@ -134,9 +166,9 @@ def mainRouter() {
   }
 
   // Low Light Conditions and Actions
-  if (pwsData.pws.solarradiation <= srStartLowLevel && pwsData.pws.solarradiation >= srStopLevel && now() >= dontStartLowTime.time && location.mode != dontRunLowMode) {
+  if (illuminanceLevel <= srStartLowLevel && illuminanceLevel >= srStopLevel && now() >= dontStartLowTime.time && location.mode != dontRunLowMode) {
     if (state.isLowSet == false) {
-      def srLowMsg = "SRLC LOW (${pwsData.pws.solarradiation}):\n"
+      def srLowMsg = "${state.logHandle} LOW (${illuminanceLevel}):\n"
       
       if (srLowOffDevices != null ) {
       	srLowOffDevices.off()
@@ -160,6 +192,7 @@ def mainRouter() {
 
       state.isLowSet = true
       state.lastRun = now()
+      
       log.info $srLowMsg
       sendNotificationEvent("${srLowMsg}")
     }
@@ -168,26 +201,27 @@ def mainRouter() {
     state.isLowSet = false
   }
 
-  log.info "SRLC Solar Radiation: ${pwsData.pws.solarradiation}"
-  log.info "SRLC PWS Verification: ${pwsData.app.updated_long}"
-  log.info "SRLC Result: HIGH:${state.isHighSet} LOW:${state.isLowSet} (${state.lastRun})"
+  logger('info','poll',"Solar Radiation: ${illuminanceLevel}")
+  logger('info','poll',"Result: HIGH:${state.isHighSet} LOW:${state.isLowSet} (${state.lastRun})")
 }
 
-def fetchJSON(pwsURI) {
-  def params = [
-    uri: pwsURI,
-    format: 'json',
-    contentType: 'application/json'
-  ]
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  try {
-    httpGet(params) { response ->
-      log.info "SRLC: httpGet (OK)"
-      return response.data
-    }
+private static double round(double value, int precision) {
+  if (precision == 0) {
+   return (int) Math.round(value)
   }
-  catch (e) {
-    log.error "SRLC: httpGet (ERROR: $e)"
-    return "ERROR: $e"
+  
+  int scale = (int) Math.pow(10,precision)
+  return (double) Math.round(value*scale)/scale
+}
+
+private logger(type,loc,msg) {
+  // type: error, warn, info, debug, trace
+  if ("${type}" == 'info') {
+    log."${type}" "${state.logHandle} [${loc}]: ${msg}"
+  }
+  else if (state.logMode > 0) {
+    log."${type}" "${state.logHandle} [${loc}]: ${msg}"
   }
 }
