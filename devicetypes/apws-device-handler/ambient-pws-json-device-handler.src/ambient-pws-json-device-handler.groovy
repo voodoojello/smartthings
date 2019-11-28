@@ -140,8 +140,8 @@ def refresh() {
 }
 
 def initialize() {
-  state.logMode   = 1
-  state.logHandle = 'apws-dh'
+  state.logMode   = 0
+  state.logHandle = 'APWS'
   state.pws       = [:]
   logger('info','initialize',"Logging set to ${state.debugMode}")
 
