@@ -43,38 +43,38 @@ def mainPage() {
     }
 
     section ("Select Thermostats") {
-      input "thermostats", "capability.thermostat", title: "Select thermostats:", multiple: true, required: true
+      input ("thermostats", "capability.thermostat", title: "Select thermostats:", multiple: true, required: true)
     }
     
     section ("Select Weather Source") {
-      input "temperatureValue", "capability.temperatureMeasurement", title: "Outside Temperature Source:", required: true
-      input "humidityValue", "capability.relativeHumidityMeasurement", title: "Outside Humidity Source:", required: true
+      input ("temperatureValue", "capability.temperatureMeasurement", title: "Outside Temperature Source:", required: true)
+      input ("humidityValue", "capability.relativeHumidityMeasurement", title: "Outside Humidity Source:", required: true)
     }
 
     section ("Day/Night Temperature Presets") {
-      input "dayCool", "decimal", title: "Day cooling temperature:", required: true
-      input "nightCool", "decimal", title: "Night cooling temperature:", required: true
-      input "dayHeat", "decimal", title: "Day heating temperature:", required: true
-      input "nightHeat", "decimal", title: "Night heating temperature:", required: true
+      input ("dayCool", "decimal", title: "Day cooling temperature:", required: true)
+      input ("nightCool", "decimal", title: "Night cooling temperature:", required: true)
+      input ("dayHeat", "decimal", title: "Day heating temperature:", required: true)
+      input ("nightHeat", "decimal", title: "Night heating temperature:", required: true)
     }
 
     section ("Heating/Cooling Changeover Temperatures") {
-      input "modeThresCool", "decimal", title: "Cooling temperature threshold:", required: true
-      input "modeThresHeat", "decimal", title: "Heating temperature threshold:", required: true
+      input ("modeThresCool", "decimal", title: "Cooling temperature threshold:", required: true)
+      input ("modeThresHeat", "decimal", title: "Heating temperature threshold:", required: true)
     }
 
     section ("Default Away Mode Temperatures") {
-	  input "awayCoolTemp", "number", title: "Default away cooling temperature:", multiple: false, required: true
-	  input "awayHeatTemp", "number", title: "Default away heating temperature:", multiple: false, required: true
+	  input ("awayCoolTemp", "number", title: "Default away cooling temperature:", multiple: false, required: true)
+	  input ("awayHeatTemp", "number", title: "Default away heating temperature:", multiple: false, required: true)
     }
 
     section ("Night Start/Stop") {
-      input "nightStart", "time", title: "Night cycle starts at hour:", required: true
-      input "nightStop", "time", title: "Night cycle stops at hour:", required: true
+      input ("nightStart", "time", title: "Night cycle starts at hour:", required: true)
+      input ("nightStop", "time", title: "Night cycle stops at hour:", required: true)
     }
 
-    section ("Virtual Hold Switch for Override") {
-      input "thermHoldSwitch", "capability.switch", required: true, title: "Choose the virtual hold switch:"
+    section ("Enable / Disable HVAC Control") {
+      input("hvaccEnable", "enum", title: "Enable / Disable HVACC Control", options: ["Enable","Disable"])
     }
     
     section ("Humidity Scaling Factor") {
@@ -83,6 +83,7 @@ def mainPage() {
     }
   }
 }
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -93,23 +94,38 @@ def installed() {
 
 def updated() {
   logger('info','updated',"Updated with settings: ${settings}")
- 
   unsubscribe()
+  unschedule()
   initialize()
 }
 
 def initialize() {
+  state.shmStatus = 'off'
   state.logMode   = 0
-  state.logHandle = 'hvacc-sa'
+  state.logHandle = 'HVACC'
+  
+  subscribe(location, "alarmSystemStatus" , shmHandler)
+  subscribe(temperatureValue, "temperatureMeasurement" , pwsHandler)
+  subscribe(humidityValue, "relativeHumidityMeasurement" , pwsHandler)
   
   poll()
-  runEvery5Minutes(poll)
+}
+
+def shmHandler(evt) {
+  logger('info','shmHandler',"Smart Home Monitor ${evt.name} changed to ${evt.value}")
+  state.shmStatus = evt.value
+  poll()
+}
+
+def pwsHandler(evt) {
+  logger('info','pwsHandler',"PWS ${evt.name} changed to ${evt.value}")
+  poll()
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def poll() {
-  logger('info','poll',"Starting...")
+  logger('info','poll',"Polling...")
   
   def adjTemp     = 72
   def hvacMode    = 'off'
@@ -133,7 +149,7 @@ def poll() {
 
   logger('debug','poll',"osTemp: ${osTemp}, osHumi: ${osHumi}, feelsLike: ${feelsLike}, windSpeed: ${windSpeed}, dewPoint: ${dewPoint}, absPressure: ${absPressure}, relPressure: ${relPressure}, modeThresHeat: ${modeThresHeat}, modeThresCool: ${modeThresCool}, hvacMode: ${hvacMode}")
   
-  if (thermHoldSwitch.currentSwitch == 'off') {
+  if (hvaccEnable == 'Enable') {
   	if (hvacMode == "heat") {
       adjTemp = adjustTemp(dayHeat,osTemp,feelsLike,osHumi)
       
@@ -141,7 +157,7 @@ def poll() {
         adjTemp = adjustTemp(nightHeat,osTemp,feelsLike,osHumi)
       }
       
-      if (currMode.toLowerCase() == "away") {
+      if (currMode.toLowerCase() == "away" || state.shmStatus.toLowerCase() == 'away') {
         adjTemp = awayHeatTemp
       }
     
@@ -170,40 +186,45 @@ def poll() {
       thermostats.off()
     }
 
-	if (hasChange(hvacMode,adjTemp)) {
-      sendNotificationEvent("${state.logHandle}: Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
-      logger('info','poll',"Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
-    }
+    sendNotificationEvent("${state.logHandle}: Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp} (osTemp: ${osTemp}, feelsLike: ${feelsLike}, osHumi ${osHumi})")
+    logger('info','poll',"Set HVAC mode to ${hvacMode}, set temperature to ${adjTemp}")
   }
   else {
-	if (hasChange(hvacMode,adjTemp)) {
-      sendNotificationEvent("${state.logHandle}: thermHoldSwitch is ON, no action taken.")
-      logger('info','poll',"thermHoldSwitch is ON, no action taken.")
-    }
+    sendNotificationEvent("${state.logHandle}: Override is ${hvaccEnable}, no action taken.")
+    logger('info','poll',"Override is ${hvaccEnable}, no action taken.")
   }
   
-  logger('debug','poll',"hvacMode: ${hvacMode}, adjTemp: ${adjTemp}, currMode: ${currMode}, isNight: ${isNight}, thermHoldSwitch: ${thermHoldSwitch.currentSwitch}")
+  logger('debug','poll',"hvacMode: ${hvacMode}, adjTemp: ${adjTemp}, currMode: ${currMode}, isNight: ${isNight}, hvaccEnable: ${hvaccEnable}")
   logger('debug','poll',getThermStates())
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-private hasChange(mode,adjTemp) {
-  def ret = false
-  def currentState = getThermStates()
-  
+private hasChange(hvacMode,adjTemp) {
+  def stateReturn     = false
+  def currentSetTemp  = 0
+  def currentHvacMode = "none"
+  def currentState    = getThermStates()
+  def currentAdjTemp  = round(adjTemp,2)
+
   currentState.each {
-  	if (adjTemp.round() != it.value.temperature) {
-      ret = true
+    def thisReturn  = false
+    currentSetTemp  = round(it.value.temperature,2)
+    currentHvacMode = it.value.thermostatMode
+    
+  	if (currentAdjTemp != currentSetTemp) {
+      thisReturn  = true
+      stateReturn = true
     }
-  	if (mode != it.value.thermostatMode) {
-      ret = true
+  	if (hvacMode != currentHvacMode) {
+      thisReturn  = true
+      stateReturn = true
     }
+    
+    logger('debug','hasChange',"thermostatName: ${it.value.thermostatName}, hvacMode: ${hvacMode} (${currentHvacMode}), adjTemp: ${currentAdjTemp} (${currentSetTemp}), thisReturn: ${thisReturn}, stateReturn: ${stateReturn}")
   }
-  
-  logger('debug','hasChange',"mode: ${mode}, adjTemp: ${adjTemp}, return: ${ret}")
-  
-  return ret
+    
+  return stateReturn
 }
 
 private getThermStates() {
@@ -213,12 +234,15 @@ private getThermStates() {
     def key   = "${it.label}"
   	def inner = [:]
     
+    inner.thermostatName           = it.label
     inner.thermostatOperatingState = it.currentValue("thermostatOperatingState")
     inner.temperature              = it.currentValue("temperature")
     inner.thermostatMode           = it.currentValue("thermostatMode")
     inner.thermostatFanMode        = it.currentValue("thermostatFanMode")
     inner.coolingSetpoint          = it.currentValue("coolingSetpoint")
     inner.heatingSetpoint          = it.currentValue("heatingSetpoint")
+    
+    logger('debug','getThermStates',inner)
     
     ret.put((key),inner)
   }
@@ -245,6 +269,10 @@ private adjustTemp(setTemp,osTemp,feelsLike,humidity) {
 }
 
 private static double round(double value, int precision) {
+  if (precision == 0) {
+   return (int) Math.round(value)
+  }
+  
   int scale = (int) Math.pow(10,precision)
   return (double) Math.round(value*scale)/scale
 }
