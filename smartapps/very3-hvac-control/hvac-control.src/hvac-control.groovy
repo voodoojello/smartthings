@@ -7,6 +7,8 @@
 //  Dynamically control HVAC settings based on presence and published capabilities of the very3 Ambient PWS Device Handler. 
 //  For more information see: https://github.com/voodoojello/smartthings/tree/master/devicetypes/apws-device-handler
 //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at:
 //
@@ -105,8 +107,9 @@ def updated() {
 
 def initialize() {
   state.logMode      = 0
-  state.shmStatus    = 'off'
   state.logHandle    = 'HVACC'
+  state.shmStatus    = 'off'
+
   state.prevMode     = 'none'
   state.prevSetPoint = 'none'
   
@@ -137,9 +140,12 @@ def poll() {
   def hvacMode    = 'off'
   def currMode    = location.mode
   def isNight     = timeOfDayIsBetween(nightStart, nightStop, new Date(), location.timeZone)
-  def osTemp      = (temperatureValue.latestValue("temperatureMeasurement") as BigDecimal)
+  
   def osHumi      = (humidityValue.latestValue("relativeHumidityMeasurement") as BigDecimal)
+  def osTemp      = (temperatureValue.latestValue("temperatureMeasurement") as BigDecimal)
   def feelsLike   = (temperatureValue.latestValue("feelsLikeTemp") as BigDecimal)
+  
+  // Future use...
   def windSpeed   = (temperatureValue.latestValue("windSpeed") as BigDecimal)
   def dewPoint    = (temperatureValue.latestValue("dewPoint") as BigDecimal)
   def absPressure = (temperatureValue.latestValue("absoluteBarometricPressure") as BigDecimal)
@@ -219,11 +225,11 @@ def poll() {
   else {
     if (hasChange(hvacMode,adjTemp)) {
       sendNotificationEvent("${state.logHandle}: Override is ${hvaccEnable}, no action taken.")
-      logger('info','poll',"Override is ${hvaccEnable}, no action taken.")
+      logger('info','poll-override',"Override is ${hvaccEnable}, no action taken.")
     }
   }
   
-  logger('debug','poll',"hvacMode: ${hvacMode}, adjTemp: ${adjTemp}, currMode: ${currMode}, isNight: ${isNight}, hvaccEnable: ${hvaccEnable}")
+  logger('trace','poll',"hvacMode: ${hvacMode}, adjTemp: ${adjTemp}, currMode: ${currMode}, isNight: ${isNight}, hvaccEnable: ${hvaccEnable}")
   logger('debug','poll',getThermStates())
 }
 
@@ -244,12 +250,16 @@ private hasChange(hvacMode,adjTemp) {
     coolingSetpoint = round(it.value.coolingSetpoint,2)
     heatingSetpoint = round(it.value.heatingSetpoint,2)
     currentHvacMode = it.value.thermostatMode
-    
+    state.prevMode  = currentHvacMode
+
   	if ("${hvacMode}" != "${currentHvacMode}") {
-      state.prevMode = currentHvacMode
       thisChange     = 'hvacMode'
       thisReturn     = true
       stateReturn    = true
+    }
+    
+    if ("${hvacMode}" == "off") {
+      thisChange = "0 (off)"
     }
     
     if ("${hvacMode}" == "cool") {
@@ -284,7 +294,7 @@ private hasChange(hvacMode,adjTemp) {
       }
     }
     
-    logger('debug','hasChange',"thermostatName: ${it.value.thermostatName}, hvacMode: ${hvacMode} (${state.prevMode}), adjTemp: ${currentAdjTemp} (${state.prevSetPoint}), thisChange: ${thisChange}, changeThreshold ${changeThreshold}, thisReturn: ${thisReturn}, stateReturn: ${stateReturn}")
+    logger('trace','hasChange',"thermostatName: ${it.value.thermostatName}, hvacMode: ${hvacMode} (${state.prevMode}), adjTemp: ${currentAdjTemp} (${state.prevSetPoint}), thisChange: ${thisChange}, changeThreshold ${changeThreshold}, thisReturn: ${thisReturn}, stateReturn: ${stateReturn}")
   }
    
   return stateReturn
@@ -305,7 +315,7 @@ private getThermStates() {
     inner.coolingSetpoint          = it.currentValue("coolingSetpoint")
     inner.heatingSetpoint          = it.currentValue("heatingSetpoint")
     
-    logger('debug','getThermStates',inner)
+    logger('trace','getThermStates',inner)
     
     funcReturn.put((key),inner)
   }
@@ -327,7 +337,8 @@ private adjustTemp(setTemp,osTemp,feelsLike,humidity) {
     adjustedReturn = (setTemp - difTemp)
   }
   
-  logger('info','adjustTemp',"setTemp: ${setTemp}, difTemp: ${difTemp}, return: ${adjustedReturn}, osTemp: ${osTemp}, feelsLike: ${feelsLike}, humidity: ${humidity}")
+  logger('trace','adjustTemp',"setTemp: ${setTemp}, difTemp: ${difTemp}, return: ${adjustedReturn}, osTemp: ${osTemp}, feelsLike: ${feelsLike}, humidity: ${humidity}")
+  
   return round(adjustedReturn,1)
 }
 
@@ -342,12 +353,12 @@ private static double round(double value, int precision) {
   return (double) Math.round(value*scale)/scale
 }
 
-private logger(type,loc,msg) {
-  // type: error, warn, info, debug, trace
-  if ("${type}" == 'info') {
-    log."${type}" "${state.logHandle} [${loc}]: ${msg}"
+private logger(level,loc,msg) {
+  // level: error, warn, info, debug, trace
+  if ("${level}" == 'info') {
+    log."${level}" "${state.logHandle} [${loc}]: ${msg}"
   }
   else if (state.logMode > 0) {
-    log."${type}" "${state.logHandle} [${loc}]: ${msg}"
+    log."${level}" "${state.logHandle} [${loc}]: ${msg}"
   }
 }
