@@ -2,7 +2,16 @@
 //
 //  Ambient PWS JSON Device Handler for SmartThings
 //  Copyright (c)2019-2020 Mark Page (mark@very3.net)
-//  Modified: Fri Nov 29 17:29:49 CST 2019
+//  Modified: Sat Nov 30 06:42:39 CST 2019
+//
+//  This SmartThings device handler is for the Ambient Weather Station and depends on a JSON source to pull 
+//  data from the Ambient Weather ObserverIP, the Ambient Weather API, and/or a METAR source. This has been 
+//  tested with Ambient weather stations WS-1900, WS-2000, and the WS-2600 using the Ambient Weather ObserverIP.
+//  A scraper to convert the ObserverIP Live Data to JSON is available at:
+//
+//      https://gist.github.com/voodoojello/3a53c1c6df78766862e45601acbeca2e
+//
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at:
@@ -14,15 +23,6 @@
 //  See the License for the specific language governing permissions and limitations under the License.
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-//  This SmartThings device handler is for the Ambient Weather Station and depends on a JSON source to pull 
-//  data from the Ambient Weather ObserverIP, the Ambient Weather API, and/or a METAR source. This has been 
-//  tested with Ambient weather stations WS-1900, WS-2000, and the WS-2600 using the Ambient Weather ObserverIP (1.0).
-//  A scraper to convert the ObserverIP Live Data to JSON is available at:
-//
-//      https://gist.github.com/voodoojello/3a53c1c6df78766862e45601acbeca2e
-//
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 import groovy.json.JsonSlurper
 include 'asynchttp_v1'
@@ -30,7 +30,7 @@ include 'asynchttp_v1'
 metadata {
   definition (
     name: "Ambient PWS JSON Device Handler",
-    version: "19.11.24.8",
+    version: "19.11.30.6",
     namespace: "very3-apws-device-handler",
     author: "Mark Page",
     description: "Virtual device handler for Ambient PWS JSON sources",
@@ -49,6 +49,7 @@ metadata {
       attribute "feelsLikeTemp", "number"
       attribute "dewPoint", "number"
       attribute "windSpeed", "number"
+      attribute "windGust", "number"
       attribute "windDirectionCardinal", "string"
       attribute "windDirectionDegrees", "number"
       attribute "relativeBarometricPressure", "number"
@@ -150,7 +151,7 @@ def initialize() {
   logger('info','initialize',"Logging set to ${state.debugMode}")
 
   poll()
-  runEvery5Minutes(poll)
+  runEvery1Minute(poll)
 }
 
 def poll() {
@@ -192,6 +193,7 @@ def parse(description) {
   sendEvent(name:"absoluteBarometricPressure", value:pwsData.pws.baromabsin)
   sendEvent(name:"relativeBarometricPressure", value:pwsData.pws.baromrelin)
   sendEvent(name:"windSpeed", value:pwsData.pws.windspeedmph, unit:"mph")
+  sendEvent(name:"windGust", value:pwsData.pws.windgustmph, unit:"mph")
   sendEvent(name:"windDirectionCardinal", value:cardinalPoints[cardinalIndex.toInteger()])
   sendEvent(name:"windDirectionDegrees", value:pwsData.pws.winddir)
   sendEvent(name:"dewPoint", value:pwsData.pws.dewPoint, unit:"F")
