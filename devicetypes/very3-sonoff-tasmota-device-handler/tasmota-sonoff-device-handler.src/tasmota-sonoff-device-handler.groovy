@@ -135,13 +135,13 @@ def initialize() {
   sendCmnd("Time 0")
   logger('info','initialize',"Setting time to ${unixEpoch}")
   
-  sendCmnd("Status 0")
   sendEvent(name: "checkInterval", value: 60, displayed: false, data: [protocol: "lan", hubHardwareId: device.hub.hardwareID, offlinePingable: "1"])
-  runIn(runInSecs, poll)
+  poll()
 }
 
 def poll() {
   logger('info','poll',"Starting polling cycle (${runInSecs}s frequency)")
+  runIn(runInSecs, poll)
   sendCmnd("Status 0")
 }
 

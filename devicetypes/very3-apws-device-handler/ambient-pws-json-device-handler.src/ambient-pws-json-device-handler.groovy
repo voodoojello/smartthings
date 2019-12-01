@@ -152,12 +152,12 @@ def initialize() {
   logger('info','initialize',"Logging set to ${state.debugMode}")
 
   poll()
-  runIn(runInSecs, poll)
 }
 
 def poll() {
   logger('info','poll',"Starting polling cycle (${runInSecs}s intervals)")
   fetchJSON()
+  runIn(runInSecs, poll)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
