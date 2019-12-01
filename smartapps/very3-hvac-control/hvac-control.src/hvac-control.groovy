@@ -115,6 +115,7 @@ def initialize() {
   
   subscribe(location, "alarmSystemStatus" , shmHandler)
   subscribe(temperatureValue, "temperatureMeasurement" , pwsHandler)
+  subscribe(temperatureValue, "feelsLikeTemp" , pwsHandler)
   subscribe(humidityValue, "relativeHumidityMeasurement" , pwsHandler)
   
   poll()
