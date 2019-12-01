@@ -68,6 +68,7 @@ metadata {
     section {
       input name: "lanDevIPAddr", type: "text", title: "LAN PWS JSON Source IP Address", description: "IP Address of the PWS JSON source", required: true, displayDuringSetup: true
       input name: "lanDevIPPort", type: "number", title: "LAN PWS JSON Source IP Port", description: "Port of the PWS JSON source",  defaultValue: "80", displayDuringSetup: true
+      input name: "runInSecs", type: "number", title: "PWS Polling Frequency", description: "Polling PWS Every XXX Seconds",  defaultValue: "360", displayDuringSetup: true
     }
   }
 
@@ -114,7 +115,7 @@ metadata {
     }
 
     standardTile("updated", "device.updated", decoration:"flat", width:6, height:2, wordWrap:false) {
-      state "val", label:'Updated: ${currentValue}', action:"refresh.refresh", icon:"st.Health & Wellness.health7"
+      state "val", label:'${currentValue}', action:"refresh.refresh", icon:"st.Health & Wellness.health7"
     }
 
     main(["temperature"])
@@ -151,11 +152,11 @@ def initialize() {
   logger('info','initialize',"Logging set to ${state.debugMode}")
 
   poll()
-  runEvery1Minute(poll)
+  runIn(runInSecs, poll)
 }
 
 def poll() {
-  logger('info','poll',"Starting polling cycle")
+  logger('info','poll',"Starting polling cycle (${runInSecs}s intervals)")
   fetchJSON()
 }
 
@@ -178,13 +179,13 @@ def parse(description) {
   sendEvent(name:"pressure_composite", value: "ABSP: ${pwsData.pws.baromabsin} inMg${spacer}RELP: ${pwsData.pws.baromrelin} inMg")
   sendEvent(name:"rain_composite", value: "D: ${pwsData.pws.dailyrainin}\"${spacer}W: ${pwsData.pws.weeklyrainin}\"${spacer}M: ${pwsData.pws.monthlyrainin}\"${spacer}Y: ${pwsData.pws.totalrainin}\"")
   sendEvent(name:"wind_composite", value: "S: ${pwsData.pws.windspeedmph} mph${spacer}G: ${pwsData.pws.windgustmph} mph${spacer}D: ${cardinalPoints[cardinalIndex.toInteger()]} (${pwsData.pws.winddir}°)")
+  sendEvent(name:"updated", value: "Updated: ${pwsData.app.updated_long} (${runInSecs}s)")
 
   sendEvent(name:"temperature", value:pwsData.pws.tempf, unit:"F")
   sendEvent(name:"illuminance", value:pwsData.pws.solarradiation, unit:"lux")
   sendEvent(name:"uv", value:pwsData.pws.uv)
   sendEvent(name:"solarradiation", value:pwsData.pws.solarradiation)
   sendEvent(name:"humidity", value:pwsData.pws.humidity, unit:"%")
-  sendEvent(name:"updated", value: pwsData.app.updated_long)
 
   sendEvent(name:"relativeHumidityMeasurement", value:pwsData.pws.humidity, unit:"%")
   sendEvent(name:"temperatureMeasurement", value:pwsData.pws.tempf, unit:"F")
