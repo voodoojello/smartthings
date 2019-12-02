@@ -51,8 +51,6 @@ metadata {
       capability "Outlet"
       
       command "deviceToggle"
-      command "deviceOn"
-      command "deviceOff"
     }
 
   simulator {
@@ -80,10 +78,10 @@ metadata {
   tiles (scale: 2) {
     multiAttributeTile(name:"switch", type: "generic", width: 6, height: 4, canChangeIcon: false){
       tileAttribute ("device.switch", key: "PRIMARY_CONTROL") {
-        attributeState "on", label:'${name}', action:"deviceOff", backgroundColor:"#00a0dc", icon: "st.switches.switch.on", nextState:"turningOff"
-        attributeState "off", label:'${name}', action:"deviceOn", backgroundColor:"#ffffff", icon: "st.switches.switch.off", nextState:"turningOn"
-        attributeState "turningOn", label:'Turning On', action:"deviceOff", backgroundColor:"#00a0dc", icon: "st.switches.switch.off", nextState:"turningOn"
-        attributeState "turningOff", label:'Turning Off', action:"deviceOn", backgroundColor:"#ffffff", icon: "st.switches.switch.on", nextState:"turningOff"
+        attributeState "on", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", backgroundColor:"#00a0dc", nextState:"turningOff"
+        attributeState "off", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", backgroundColor:"#ffffff", nextState:"turningOn"
+        attributeState "turningOn", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", backgroundColor:"#00a0dc", nextState:"turningOff"
+        attributeState "turningOff", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", backgroundColor:"#ffffff", nextState:"turningOn"
       }
       tileAttribute("device.wifi_info", key: "SECONDARY_CONTROL") {
         attributeState "wifi_info", label:'${currentValue}', defaultState: true
@@ -124,8 +122,8 @@ def refresh() {
 }
 
 def initialize() {
-  state.logHandle   = 'TSDH'
   state.logMode     = 0
+  state.logHandle   = 'TSDH'
   state.deviceState = ""
   logger('info','initialize',"Logging set to ${state.debugMode}")
   
@@ -244,7 +242,7 @@ def deviceToggle() {
   logger('debug','deviceToggle',"switchMode: ${switchMode}, deviceState: ${state.deviceState}, toggleTime: ${toggleTime}")
 }
 
-def deviceOn() {
+def on() {
   if ("${switchMode}" == "Toggle") {
     deviceToggle()
   }
@@ -256,7 +254,7 @@ def deviceOn() {
   logger('debug','deviceOn',"switchMode: ${switchMode}, deviceState: ${state.deviceState}, toggleTime: ${toggleTime}")
 }
 
-def deviceOff() {
+def off() {
   if ("${switchMode}" == "Toggle") {
     deviceToggle()
   }
