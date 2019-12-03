@@ -1,13 +1,15 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Illuminance (solar radiation) Device Control for SmartThings
+//  Illuminance (via solar radiation) Device Control for SmartThings
 //  Copyright (c)2019-2020 Mark Page (mark@very3.net)
-//  Modified: Thu Nov 28 9:11:21 CST 2019
+//  Modified: Tue Dec 3 19:34:20 CST 2019
 //
 //  Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS
 //  Device Handler. For more information see:
 //
 //      https://github.com/voodoojello/smartthings/tree/master/devicetypes/apws-device-handler
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at:
@@ -46,8 +48,8 @@ def mainPage() {
       paragraph "Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS Device Handler."
     }
 
-    section ("Select Illuminance Source") {
-      input ("illuminanceValue", "capability.illuminanceMeasurement", title: "Illuminance Measurement Source:", required: true)
+    section ("Select Solar Radiation Source") {
+      input ("solarRadiationValue", "capability.illuminanceMeasurement", title: "Solar Radiation Measurement Source:", required: true)
     }
 
     section ("Setting for low-light conditions") {
@@ -91,24 +93,24 @@ def updated() {
 }
 
 def initialize() {
-  state.logMode     = 0
-  state.logHandle   = 'SRLC'
-  
-  state.isLowSet    = false
-  state.isHighSet   = false
-  state.lastRun     = 'never'
-  state.illuminance = 0
-  state.shmStatus   = 'off'
+  state.logMode        = 2
+  state.logHandle      = 'SRLC'
 
-  subscribe(illuminanceValue, "illuminanceMeasurement" , illuminanceHandler)
+  state.isLowSet       = false
+  state.isHighSet      = false
+  state.lastRun        = 'never'
+  state.solarRadiation = solarRadiationValue.latestValue("solarRadiation")
+  state.shmStatus      = 'off'
+
+  subscribe(solarRadiationValue, "solarRadiation" , srHandler)
   subscribe(location, "alarmSystemStatus" , shmHandler)
   
   poll()
 }
 
-def illuminanceHandler(evt) {
-  logger('info','illuminanceHandler',"Illuminance Measurement ${evt.name} changed from ${state.illuminance} to ${evt.value}")
-  state.illuminance = evt.value
+def srHandler(evt) {
+  logger('info','srHandler',"Solar Radiation Measurement ${evt.name} changed from ${state.solarRadiation} to ${evt.value}")
+  state.solarRadiation = evt.value
   poll()
 }
 
@@ -123,30 +125,29 @@ def shmHandler(evt) {
 def poll() {
   logger('info','poll',"Starting...")
 
-  def tz = location.timeZone
-  def dontStartLowTime  = timeToday(dontRunLowBefore,tz)
-  def dontStartHighTime = timeToday(dontRunHighBefore,tz)
-  
-  BigDecimal illuminanceLevel = new BigDecimal(state.illuminance)
+  def localTimeZone       = location.timeZone
+  def dontStartLowTime    = timeToday(dontRunLowBefore,localTimeZone)
+  def dontStartHighTime   = timeToday(dontRunHighBefore,localTimeZone)
+  def solarRadiationLevel = new BigDecimal(state.solarRadiation).setScale(2, BigDecimal.ROUND_HALF_UP)
 
   // High Light Conditions and Actions
-  if (illuminanceLevel >= srStartHighLevel && illuminanceLevel >= srStopLevel && now() >= dontStartHighTime.time && location.mode != dontRunHighMode) {
-    if (state.isHighSet == false) {
-      def srHighMsg = "${state.logHandle} HIGH (${illuminanceLevel}):\n"
-      
+  if (solarRadiationLevel >= srStartHighLevel && solarRadiationLevel >= srStopLevel && now() >= dontStartHighTime.time && location.mode != dontRunHighMode) {
+    def srHighMsg = "mode: ${location.mode}, "
+    
+    if (state.isHighSet == false) {      
       if (srHighOffDevices != null) {
         srHighOffDevices.off()
-        srHighMsg += "Turned OFF: ${srHighOffDevices}\n\n"
+        srHighMsg += "Turned OFF: ${srHighOffDevices}"
       }
       
       if (srHighOnDevices != null) {
         srHighOnDevices.on()
-        srHighMsg += "Turned ON: ${srHighOnDevices}\n\n"
+        srHighMsg += "Turned ON: ${srHighOnDevices}"
       }
       
       if (srHighDoors != null) {
         srHighDoors.close()
-        srHighMsg += "CLOSED Doors: ${srHighOnDevices}\n\n"
+        srHighMsg += "CLOSED Doors: ${srHighOnDevices}"
       }
       
       if (srHighRoutine != null) {
@@ -155,10 +156,10 @@ def poll() {
       }
 
       state.isHighSet = true
-      state.lastRun = now()
+      state.lastRun   = now()
       
-      logger('info','poll',"${srHighMsg}")
-      sendNotificationEvent("${srHighMsg}")
+      logger('info','srHighMsg',"${srHighMsg}")
+      sendNotificationEvent("[${state.logHandle}]: (srHighMsg) ${srHighMsg}")
     }
   }
   else {
@@ -166,23 +167,23 @@ def poll() {
   }
 
   // Low Light Conditions and Actions
-  if (illuminanceLevel <= srStartLowLevel && illuminanceLevel >= srStopLevel && now() >= dontStartLowTime.time && location.mode != dontRunLowMode) {
+  if (solarRadiationLevel <= srStartLowLevel && solarRadiationLevel >= srStopLevel && now() >= dontStartLowTime.time && location.mode != dontRunLowMode) {
     if (state.isLowSet == false) {
-      def srLowMsg = "${state.logHandle} LOW (${illuminanceLevel}):\n"
+      def srLowMsg = "mode: ${location.mode}, "
       
       if (srLowOffDevices != null ) {
       	srLowOffDevices.off()
-        srLowMsg += "Turned OFF: ${srLowOffDevices}\n\n"
+        srLowMsg += "Turned OFF: ${srLowOffDevices}"
       }
       
       if (srLowOnDevices != null) {
         srLowOnDevices.on()
-        srLowMsg += "Turned ON: ${srLowOnDevices}\n\n"
+        srLowMsg += "Turned ON: ${srLowOnDevices}"
       }
       
       if (srLowDoors != null) {
         srLowDoors.close()
-        srLowMsg += "CLOSED Doors: ${srLowDoors}\n\n"
+        srLowMsg += "CLOSED Doors: ${srLowDoors}"
       }
       
       if (srLowRoutine != null) {
@@ -191,25 +192,25 @@ def poll() {
       }
 
       state.isLowSet = true
-      state.lastRun = now()
-      
-      log.info $srLowMsg
-      sendNotificationEvent("${srLowMsg}")
+      state.lastRun  = now()
+
+      logger('info','srLowMsg',"${srHighMsg}")
+      sendNotificationEvent("[${state.logHandle}]: (srLowMsg) ${srLowMsg}")
     }
   }
   else {
     state.isLowSet = false
   }
 
-  logger('info','poll',"Solar Radiation: ${illuminanceLevel}")
-  logger('info','poll',"Result: HIGH:${state.isHighSet} LOW:${state.isLowSet} (${state.lastRun})")
+  logger('trace','poll',"solarRadiationLevel: ${solarRadiationLevel}, isHighSet: ${state.isHighSet}, isLowSet: ${state.isLowSet}, lastRun: ${state.lastRun}, mode: ${location.mode}")
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 private static double round(double value, int precision) {
   if (precision == 0) {
-   return (int) Math.round(value)
+   return new BigDecimal(value).setScale(0, BigDecimal.ROUND_HALF_UP)
+   //return (int) Math.round(value)
   }
   
   int scale = (int) Math.pow(10,precision)
@@ -221,7 +222,10 @@ private logger(type,loc,msg) {
   if ("${type}" == 'info') {
     log."${type}" "${state.logHandle} [${loc}]: ${msg}"
   }
-  else if (state.logMode > 0) {
+  else if (state.logMode > 0 && "${type}" == 'trace') {
+    log."${type}" "${state.logHandle} [${loc}]: ${msg}"
+  }
+  else if (state.logMode > 1) {
     log."${type}" "${state.logHandle} [${loc}]: ${msg}"
   }
 }
