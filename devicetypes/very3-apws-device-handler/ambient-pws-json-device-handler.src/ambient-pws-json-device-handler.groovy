@@ -49,6 +49,7 @@ metadata {
       attribute "feelsLikeTemp", "number"
       attribute "dewPoint", "number"
       attribute "windSpeed", "number"
+      attribute "solarRadiation", "number"
       attribute "windGust", "number"
       attribute "windDirectionCardinal", "string"
       attribute "windDirectionDegrees", "number"
@@ -149,7 +150,7 @@ def initialize() {
   state.logMode   = 0
   state.logHandle = 'APWS'
   state.pws       = [:]
-  logger('info','initialize',"Logging set to ${state.debugMode}")
+  logger('info','initialize',"Logging set to ${state.logMode}")
 
   poll()
 }
@@ -163,17 +164,19 @@ def poll() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def parse(description) {
-  def spacer  = "\t○\t"
+  def spacer  = " \t○\t "
   def pwsData = parseLanMessage(description).json
 
   def cardinalPoints = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW","N"]
   def cardinalIndex  = pwsData.pws.winddir%360
       cardinalIndex  = Math.round(cardinalIndex/22.5)
+      
+  def luxConversion  = round(((pwsData.pws.solarradiation * 0.175) * 683),2)
   
   logger('trace','parse',"pwsData: ${pwsData}")
 
   sendEvent(name:"temp_composite", value:"Feels Like: ${pwsData.pws.feelsLike}°F")
-  sendEvent(name:"uv_composite", value:"SR: ${pwsData.pws.solarradiation} w/m2${spacer}UVI: ${pwsData.pws.uv}")
+  sendEvent(name:"uv_composite", value:"SR: ${pwsData.pws.solarradiation} W/m²${spacer}UVI: ${pwsData.pws.uv}${spacer}Lux: ${luxConversion}")
   sendEvent(name:"cloud_composite", value:"Sky: ${pwsData.metar.sky_condition}${spacer}Visibility: ${pwsData.metar.visibility_statute_mi} mi")
   sendEvent(name:"humidity_composite", value: "Humidity: ${pwsData.pws.humidity}%${spacer}Dewpoint: ${pwsData.pws.dewPoint}°F")
   sendEvent(name:"pressure_composite", value: "ABSP: ${pwsData.pws.baromabsin} inMg${spacer}RELP: ${pwsData.pws.baromrelin} inMg")
@@ -182,14 +185,15 @@ def parse(description) {
   sendEvent(name:"updated", value: "Updated: ${pwsData.app.updated_long} (${runInSecs}s)")
 
   sendEvent(name:"temperature", value:pwsData.pws.tempf, unit:"F")
-  sendEvent(name:"illuminance", value:pwsData.pws.solarradiation, unit:"lux")
+  sendEvent(name:"illuminance", value:luxConversion, unit:"lux")
   sendEvent(name:"uv", value:pwsData.pws.uv)
-  sendEvent(name:"solarradiation", value:pwsData.pws.solarradiation)
+  sendEvent(name:"solarRadiation", value:pwsData.pws.solarradiation)
   sendEvent(name:"humidity", value:pwsData.pws.humidity, unit:"%")
 
   sendEvent(name:"relativeHumidityMeasurement", value:pwsData.pws.humidity, unit:"%")
   sendEvent(name:"temperatureMeasurement", value:pwsData.pws.tempf, unit:"F")
-  sendEvent(name:"illuminanceMeasurement", value:pwsData.pws.solarradiation, unit:"lux")
+  sendEvent(name:"illuminanceMeasurement", value:luxConversion, unit:"lux")
+  sendEvent(name:"solarRadiation", value:pwsData.pws.solarradiation, unit:"wm2")
   sendEvent(name:"ultravioletIndex", value:pwsData.pws.uv)
   sendEvent(name:"absoluteBarometricPressure", value:pwsData.pws.baromabsin)
   sendEvent(name:"relativeBarometricPressure", value:pwsData.pws.baromrelin)
@@ -245,6 +249,15 @@ private fetchJSON() {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+private static double round(double value, int precision) {
+  if (precision == 0) {
+   return (int) Math.round(value)
+  }
+  
+  int scale = (int) Math.pow(10,precision)
+  return (double) Math.round(value*scale)/scale
+}
 
 private logger(level,loc,msg) {
   // type: error, warn, info, debug, trace
