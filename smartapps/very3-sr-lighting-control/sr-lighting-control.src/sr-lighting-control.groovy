@@ -2,7 +2,7 @@
 //
 //  Illuminance (via solar radiation) Device Control for SmartThings
 //  Copyright (c)2019-2020 Mark Page (mark@very3.net)
-//  Modified: Tue Dec 3 19:34:20 CST 2019
+//  Modified: Fri Dec  6 19:38:50 CST 2019
 //
 //  Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS
 //  Device Handler. For more information see:
@@ -24,7 +24,7 @@
 
 definition (
   name: "SR Lighting Control",
-  version: "19.11.28.9",
+  version: "19.12.6.19",
   namespace: "very3-sr-lighting-control",
   author: "Mark Page",
   description: "Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS Device Handler",
@@ -54,7 +54,7 @@ def mainPage() {
 
     section ("Setting for low-light conditions") {
       input "srStartLowLevel", "number", title: "Start low-light check when solar radiation level is less than:", required: true
-      input "dontRunLowBefore","time",title:"Do not run before this time:", required: true
+      input "dontRunLowBefore","time", title:"Do not run before this time:", required: true
       input "srLowOffDevices", "capability.switch", title: "Select devices to turn OFF in low-light:", multiple: true, required: false
       input "srLowOnDevices", "capability.switch", title: "Select devices to turn ON in low-light:", multiple: true, required: false
       input "srLowDoors", "capability.garageDoorControl", title: "Select doors to CLOSE in low-light:", multiple: true, required: false
@@ -93,7 +93,7 @@ def updated() {
 }
 
 def initialize() {
-  state.logMode        = 2
+  state.logMode        = 0
   state.logHandle      = 'SRLC'
 
   state.isLowSet       = false

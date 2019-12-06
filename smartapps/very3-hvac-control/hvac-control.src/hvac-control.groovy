@@ -2,7 +2,7 @@
 //
 //  Ambient PWS / HVAC Control for SmartThings
 //  Copyright (c)2019-2020 Mark Page (mark@very3.net)
-//  Modified: Fri Nov 29 08:41:13 CST 2019
+//  Modified: Fri Dec  6 19:38:50 CST 2019
 //
 //  Dynamically control HVAC settings based on presence and published capabilities of the very3 Ambient PWS Device Handler. 
 //  For more information see: https://github.com/voodoojello/smartthings/tree/master/devicetypes/apws-device-handler
@@ -22,7 +22,7 @@
 
 definition (
   name: "HVAC Control",
-  version: "19.11.29.8",
+  version: "19.12.6.19",
   namespace: "very3-hvac-control",
   author: "Mark Page",
   description: "Dynamically control HVAC settings based on presence and published capabilities of the very3 Ambient PWS Device Handler.",
@@ -42,6 +42,11 @@ def mainPage() {
 
     section ("HVAC Control") {
       paragraph "Dynamically control HVAC settings based on presence and published capabilities of the very3 Ambient PWS Device Handler."
+    }
+
+    section ("Enable / Disable HVAC Control") {
+      paragraph "Enable / disable control from this app for manual control at thermostats"
+      input("hvaccEnable", "bool", title: "Enable HVACC Control")
     }
 
     section ("Select Thermostats") {
@@ -73,10 +78,6 @@ def mainPage() {
     section ("Night Start/Stop") {
       input ("nightStart", "time", title: "Night cycle starts at hour:", required: true)
       input ("nightStop", "time", title: "Night cycle stops at hour:", required: true)
-    }
-
-    section ("Enable / Disable HVAC Control") {
-      input("hvaccEnable", "enum", title: "Enable / Disable HVACC Control", options: ["Enable","Disable"], defaultValue:"Enable")
     }
     
     section ("Humidity Scaling") {
@@ -162,7 +163,7 @@ def poll() {
 	
   logger('debug','poll',"osTemp: ${osTemp}, osHumi: ${osHumi}, feelsLike: ${feelsLike}, windSpeed: ${windSpeed}, dewPoint: ${dewPoint}, absPressure: ${absPressure}, relPressure: ${relPressure}, modeThresHeat: ${modeThresHeat}, modeThresCool: ${modeThresCool}, hvacMode: ${hvacMode}")
   
-  if (hvaccEnable == 'Enable') {
+  if (hvaccEnable) {
     // Heating
   	if (hvacMode == "heat") {
       adjTemp = adjustTemp(dayHeat,osTemp,feelsLike,osHumi)
@@ -354,12 +355,15 @@ private static double round(double value, int precision) {
   return (double) Math.round(value*scale)/scale
 }
 
-private logger(level,loc,msg) {
-  // level: error, warn, info, debug, trace
-  if ("${level}" == 'info') {
-    log."${level}" "${state.logHandle} [${loc}]: ${msg}"
+private logger(type,loc,msg) {
+  // type: error, warn, info, debug, trace
+  if ("${type}" == 'info') {
+    log."${type}" "${state.logHandle} [${loc}]: ${msg}"
   }
-  else if (state.logMode > 0) {
-    log."${level}" "${state.logHandle} [${loc}]: ${msg}"
+  else if (state.logMode > 0 && "${type}" == 'trace') {
+    log."${type}" "${state.logHandle} [${loc}]: ${msg}"
+  }
+  else if (state.logMode > 1) {
+    log."${type}" "${state.logHandle} [${loc}]: ${msg}"
   }
 }
