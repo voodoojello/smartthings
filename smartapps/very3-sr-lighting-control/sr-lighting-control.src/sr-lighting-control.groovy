@@ -47,7 +47,12 @@ def mainPage() {
     section ("SR Lighting Control") {
       paragraph "Control lighting routines and devices based on time of day and solar radiation levels from the very3 Ambient PWS Device Handler."
     }
-
+    
+    section ("Enable / Disable SR Lighting Control") {
+      paragraph "Enable / disable control from this app for manual control of lighting"
+      input("srLightingEnable", "bool", title: "Enable SR Lighting Control")
+    }
+    
     section ("Select Solar Radiation Source") {
       input ("solarRadiationValue", "capability.illuminanceMeasurement", title: "Solar Radiation Measurement Source:", required: true)
     }
@@ -109,13 +114,13 @@ def initialize() {
 }
 
 def srHandler(evt) {
-  logger('info','srHandler',"Solar Radiation Measurement ${evt.name} changed from ${state.solarRadiation} to ${evt.value}")
+  logger('info','srHandler',"Solar Radiation Measurement ${evt.name} changed from ${state.solarRadiation} to ${evt.value} [Enabled: ${srLightingEnable}]")
   state.solarRadiation = evt.value
   poll()
 }
 
 def shmHandler(evt) {
-  logger('info','shmHandler',"Smart Home Monitor ${evt.name} changed from ${state.shmStatus} to ${evt.value}")
+  logger('info','shmHandler',"Smart Home Monitor ${evt.name} changed from ${state.shmStatus} to ${evt.value} [Enabled: ${srLightingEnable}]")
   state.shmStatus = evt.value
   poll()
 }
@@ -123,6 +128,11 @@ def shmHandler(evt) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def poll() {
+  if (srLightingEnable == false) {
+    logger('info','poll',"SR Lighting Control is disabled, no action taken.")
+    return
+  }
+  
   logger('info','poll',"Starting...")
 
   def localTimeZone       = location.timeZone
