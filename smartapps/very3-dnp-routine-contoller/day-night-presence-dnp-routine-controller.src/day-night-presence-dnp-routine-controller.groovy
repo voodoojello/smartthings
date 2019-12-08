@@ -29,7 +29,7 @@ definition (
   version: "19.12.8.6",
   namespace: "very3-dnp-routine-contoller",
   author: "Mark Page",
-  description: "The Day/Night/Presence Routine Controller for SmartThings allows conditional firing of multiple routines based on changes to presence and daylight (illumination). Secondary multiple routines can be fired after a set interval.",
+  description: "The Day/Night/Presence (DNP) Routine Controller for SmartThings allows conditional firing of multiple routines based on changes to presence and daylight (illumination). Secondary multiple routines can be fired after a set interval.",
   singleInstance: true,
   category: "SmartThings Internal",
   iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-256px.png",
@@ -53,16 +53,17 @@ preferences {
     }
 
     section("Light Change Tolerance") {
-      paragraph ("Dampens the \"Low Light Threshold\" setting to prevent the DNP Controller from bouncing between day and night. Default is ±10 lux")
+      paragraph ("Dampens the \"Low Light Threshold\" setting to prevent the DNP Controller from bouncing between day and night. Default is ±10 lux.")
       input ("lightTolerance", "number", title: "Light change tolerance (lux)", defaultValue: 10, required: false)
     }
 
     section ("Notify on Change") {
-      paragraph "Notify me in Hello Home when the DNP Routine Controller makes changes"
+      paragraph ("Notify me in \"Hello Home\" when the DNP Routine Controller makes changes")
       input("appNotify", "bool", title: "Notify on change", defaultValue: true)
     }
     
-    section ("Enable/Disable (bypass) Routine Controller") {
+    section ("Enable/Disable (bypass) DNP Routine Controller") {
+      paragraph ("Enable/Disable (bypass) the DNP Controller to prevent presence changes. Handy if you're leaving non-presence guests (like babysitters) at home alone.")
       input("appEnable", "bool", title: "Enable Presence Monitor", defaultValue: true)
     }
   }
@@ -84,12 +85,12 @@ def daySettings() {
     
     section("Day Presence Change Delayed Routines") {
       paragraph("Routines to run after delay when presence mode changes during the day (above low light threshold).")
-      input ("illuminanceHighAwayDelayedRoutine", "enum", title: "Day delayed run after everyone has left:", options: actions, multiple: true, required: false)
-      input ("illuminanceHighHomeDelayedRoutine", "enum", title: "Day delayed run after anyone arrives:", options: actions, multiple: true, required: false)
+      input ("illuminanceHighAwayDelayedRoutine", "enum", title: "Delayed routines to run when it's day, after everyone has left:", options: actions, multiple: true, required: false)
+      input ("illuminanceHighHomeDelayedRoutine", "enum", title: "Delayed routines to run when it's day, after anyone arrives:", options: actions, multiple: true, required: false)
     }
-
-    section("Delayed Day Settings") {
-      paragraph("The changes below will be run after the initial presence change based on the delay interval (in minutes) provided.")
+    
+    section("Day Presence Change Wait Interval") {
+      paragraph("Interval (in minutes) to wait before running delayed day routines.")
       input ("illuminanceHighDelay", "number", title: "Day delay interval (in minutes)", defaultValue: 10, required: false)
     }
   }
@@ -108,12 +109,12 @@ def nightSettings() {
     
     section("Night Presence Change Delayed Routines") {
       paragraph("Routines to run after delay when presence mode changes at night (below low light threshold).")
-      input ("illuminanceLowAwayDelayedRoutine", "enum", title: "Night delayed run after everyone has left:", options: actions, multiple: true, required: false)
-      input ("illuminanceLowHomeDelayedRoutine", "enum", title: "Night delayed run after anyone arrives:", options: actions, multiple: true, required: false)
+      input ("illuminanceLowAwayDelayedRoutine", "enum", title: "Delayed routines to run when it's night, after everyone has left:", options: actions, multiple: true, required: false)
+      input ("illuminanceLowHomeDelayedRoutine", "enum", title: "Delayed routines to run when it's night, after anyone arrives:", options: actions, multiple: true, required: false)
     }
-    
-    section("Delayed Night Settings") {
-      paragraph("The changes below will be run after the initial presence change based on the delay interval (in minutes) provided.")
+
+    section("Night Presence Change Wait Interval") {
+      paragraph("Interval (in minutes) to wait before running delayed night routines.")
       input ("illuminanceLowDelay", "number", title: "Night delay interval (in minutes)", defaultValue: 10, required: false)
     }
   }
@@ -136,7 +137,7 @@ def updated() {
 def initialize() {
   state.logMode   = 3
   state.logHandle = 'DNPRC'
-  state.appTitle  = 'Day/Night Routine Controller'
+  state.appTitle  = 'DNP Routine Controller'
 
   state.isHome    = null
   state.wasHome   = null
