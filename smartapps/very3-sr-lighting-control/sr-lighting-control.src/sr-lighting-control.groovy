@@ -49,7 +49,7 @@ def mainPage() {
     }
     
     section ("Enable / Disable SR Lighting Control") {
-      paragraph "Enable / disable control from this app for manual control of lighting"
+      paragraph "Enable / disable app for manual control of lighting"
       input("srLightingEnable", "bool", title: "Enable SR Lighting Control")
     }
     

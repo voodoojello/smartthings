@@ -4,7 +4,7 @@
 //  Copyright (c)2019-2020 Mark Page (mark@very3.net)
 //  Modified: Fri Dec  6 19:38:50 CST 2019
 //
-//  Dynamically control HVAC settings based on presence and published capabilities of the very3 Ambient PWS Device Handler. 
+//  Dynamically control HVAC settings based on presence and published capabilities of the very3 Ambient PWS Device Handler.
 //  For more information see: https://github.com/voodoojello/smartthings/tree/master/devicetypes/apws-device-handler
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,6 +89,12 @@ def mainPage() {
       paragraph "Minimum set temperature change required to trigger thermostat update. Sane ranges for humidity scaling are 0.0 (always) to 1.0."
       input ("changeThreshold", "decimal", title: "Change Threshold:", required: true, defaultValue:0.5)
     }
+    
+    section ("Notify on change") {
+      paragraph "Notify me when the thermostats are changes"
+      input("hvaccNotify", "bool", title: "Notify on change")
+    }
+
   }
 }
 
@@ -111,8 +117,8 @@ def initialize() {
   state.logHandle    = 'HVACC'
   state.shmStatus    = 'off'
 
-  state.prevMode     = 'none'
-  state.prevSetPoint = 'none'
+  state.prevMode     = thermostats[0].currentValue("thermostatMode")
+  state.prevSetPoint = thermostats[0].currentValue("thermostatSetpoint")
   
   subscribe(location, "alarmSystemStatus" , shmHandler)
   subscribe(temperatureValue, "temperatureMeasurement" , pwsHandler)
@@ -163,71 +169,79 @@ def poll() {
 	
   logger('debug','poll',"osTemp: ${osTemp}, osHumi: ${osHumi}, feelsLike: ${feelsLike}, windSpeed: ${windSpeed}, dewPoint: ${dewPoint}, absPressure: ${absPressure}, relPressure: ${relPressure}, modeThresHeat: ${modeThresHeat}, modeThresCool: ${modeThresCool}, hvacMode: ${hvacMode}")
   
-  if (hvaccEnable) {
-    // Heating
-  	if (hvacMode == "heat") {
-      adjTemp = adjustTemp(dayHeat,osTemp,feelsLike,osHumi)
-      
-      if (isNight) {
-        adjTemp = adjustTemp(nightHeat,osTemp,feelsLike,osHumi)
-      }
-      
-      if (currMode.toLowerCase() == 'away' || state.shmStatus.toLowerCase() == 'away') {
-        adjTemp = awayHeatTemp
-      }
-    
-      if (hasChange(hvacMode,adjTemp)) {
-        thermostats.heat()
-        thermostats.fanAuto()
-        thermostats.setHeatingSetpoint(adjTemp)
-        
-        def msgStr = "Set HVAC mode to ${hvacMode} (was ${state.prevMode}), set temperature to ${adjTemp} (was ${state.prevSetPoint}) [osTemp: ${osTemp}, feelsLike: ${feelsLike}, osHumi ${osHumi}]"
-        
-        sendNotificationEvent("${state.logHandle}: ${msgStr}")
-        logger('info','poll-heat',"${msgStr}")
-      }
-    }
-
-    // Cooling
-    if (hvacMode == "cool") {
-      adjTemp = adjustTemp(dayCool,osTemp,feelsLike,osHumi)
-
-      if (isNight) {
-        adjTemp = adjustTemp(nightCool,osTemp,feelsLike,osHumi)
-      }
-
-      if (currMode.toLowerCase() == 'away' || state.shmStatus.toLowerCase() == 'away') {
-        adjTemp = awayCoolTemp
-      }
-    
-      if (hasChange(hvacMode,adjTemp)) {
-        thermostats.cool()
-        thermostats.fanAuto()
-        thermostats.setCoolingSetpoint(adjTemp)
-        
-        def msgStr = "Set HVAC mode to ${hvacMode} (was ${state.prevMode}), set temperature to ${adjTemp} (was ${state.prevSetPoint}) [osTemp: ${osTemp}, feelsLike: ${feelsLike}, osHumi ${osHumi}]"
-        
-        sendNotificationEvent("${state.logHandle}: ${msgStr}")
-        logger('info','poll-cool',"${msgStr}")
-      }
-    }
-
-    // Off
-    if (hvacMode == "off") {
-      if (hasChange(hvacMode,adjTemp)) {
-        thermostats.off()
-        
-        def msgStr = "Set HVAC mode to ${hvacMode} (was ${state.prevMode}), set temperature to ${adjTemp} (was ${state.prevSetPoint}) [osTemp: ${osTemp}, feelsLike: ${feelsLike}, osHumi ${osHumi}]"
-        
-        sendNotificationEvent("${state.logHandle}: ${msgStr}")
-        logger('info','poll-off',"${msgStr}")
-      }
-    }
-  }
-  else {
+  // We're disabled...
+  if (hvaccEnable == false) {
     if (hasChange(hvacMode,adjTemp)) {
       sendNotificationEvent("${state.logHandle}: Override is ${hvaccEnable}, no action taken.")
       logger('info','poll-override',"Override is ${hvaccEnable}, no action taken.")
+    }
+    
+    return
+  }
+  
+  // Heating
+	if (hvacMode == "heat") {
+    adjTemp = adjustTemp(dayHeat,osTemp,feelsLike,osHumi)
+    
+    if (isNight) {
+      adjTemp = adjustTemp(nightHeat,osTemp,feelsLike,osHumi)
+    }
+    
+    if (currMode.toLowerCase() == 'away' || state.shmStatus.toLowerCase() == 'away') {
+      adjTemp = awayHeatTemp
+    }
+  
+    if (hasChange(hvacMode,adjTemp)) {
+      thermostats.heat()
+      thermostats.fanAuto()
+      thermostats.setHeatingSetpoint(adjTemp)
+      
+      def msgStr = "Set HVAC mode to ${hvacMode} (was ${state.prevMode}), set temperature to ${adjTemp} (was ${state.prevSetPoint}) [osTemp: ${osTemp}, feelsLike: ${feelsLike}, osHumi ${osHumi}]"
+      
+      if (hvaccNotify) {
+        sendNotificationEvent("${state.logHandle}: ${msgStr}")
+      }
+      logger('info','poll-heat',"${msgStr}")
+    }
+  }
+
+  // Cooling
+  if (hvacMode == "cool") {
+    adjTemp = adjustTemp(dayCool,osTemp,feelsLike,osHumi)
+
+    if (isNight) {
+      adjTemp = adjustTemp(nightCool,osTemp,feelsLike,osHumi)
+    }
+
+    if (currMode.toLowerCase() == 'away' || state.shmStatus.toLowerCase() == 'away') {
+      adjTemp = awayCoolTemp
+    }
+  
+    if (hasChange(hvacMode,adjTemp)) {
+      thermostats.cool()
+      thermostats.fanAuto()
+      thermostats.setCoolingSetpoint(adjTemp)
+      
+      def msgStr = "Set HVAC mode to ${hvacMode} (was ${state.prevMode}), set temperature to ${adjTemp} (was ${state.prevSetPoint}) [osTemp: ${osTemp}, feelsLike: ${feelsLike}, osHumi ${osHumi}]"
+      
+      if (hvaccNotify) {
+        sendNotificationEvent("${state.logHandle}: ${msgStr}")
+      }
+      logger('info','poll-cool',"${msgStr}")
+    }
+  }
+
+  // Off
+  if (hvacMode == "off") {
+    if (hasChange(hvacMode,adjTemp)) {
+      thermostats.off()
+      
+      def msgStr = "Set HVAC mode to ${hvacMode} (was ${state.prevMode}), set temperature to ${adjTemp} (was ${state.prevSetPoint}) [osTemp: ${osTemp}, feelsLike: ${feelsLike}, osHumi ${osHumi}]"
+      
+      if (hvaccNotify) {
+        sendNotificationEvent("${state.logHandle}: ${msgStr}")
+      }
+      logger('info','poll-off',"${msgStr}")
     }
   }
   
