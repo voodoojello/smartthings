@@ -2,7 +2,7 @@
 //
 //  Day/Night/Presence (DNP) Routine Controller for SmartThings
 //  Copyright (c)2019-2020 Mark Page (mark@very3.net)
-//  Modified: Sun Dec  8 06:46:29 CST 2019
+//  Modified: Sun Dec  8 10:39:43 CST 2019
 //
 //  The Day/Night/Presence Routine Controller for SmartThings allows conditional firing of multiple routines based on
 //  changes to presence and daylight (illumination). Secondary multiple routines can be fired after a set interval.
@@ -26,12 +26,13 @@
 
 definition (
   name: "Day/Night/Presence (DNP) Routine Controller",
-  version: "19.12.8.6",
+  version: "19.12.8.10",
   namespace: "very3-dnp-routine-contoller",
+  released: "Sun Dec  8 10:39:43 CST 2019",
   author: "Mark Page",
   description: "The Day/Night/Presence (DNP) Routine Controller for SmartThings allows conditional firing of multiple routines based on changes to presence and daylight (illumination). Secondary multiple routines can be fired after a set interval.",
   singleInstance: true,
-  category: "SmartThings Internal",
+  category: "My Apps",
   iconUrl: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-256px.png",
   iconX2Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png",
   iconX3Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png"
@@ -135,7 +136,7 @@ def updated() {
 }
 
 def initialize() {
-  state.logMode   = 3
+  state.logMode   = 3 // [0 = off, 1 = info, 2 = info/trace, 3 = anything]
   state.logHandle = 'DNPRC'
   state.appTitle  = 'DNP Routine Controller'
 
@@ -227,19 +228,23 @@ def router() {
   logger('info','router',"${msg}")
 
   // Route only on change
-  if (hasChange) {
+  if (hasChange) {    
     if (state.isNight == true && state.isHome == true) {
+      notify(state.appTitle,"Detected state change (Night/Home), starting run...")
       unschedule()
       nightHome()
     }
     if (state.isNight == true && state.isHome == false) {
+      notify(state.appTitle,"Detected state change (Night/Away), starting run...")
       nightAway()
     }
     if (state.isNight == false && state.isHome == true) {
+      notify(state.appTitle,"Detected state change (Day/Home), starting run...")
       unschedule()
       dayHome()
     }
     if (state.isNight == false && state.isHome == false) {
+      notify(state.appTitle,"Detected state change (Day/Away), starting run...")
       dayAway()
     }
   }
@@ -320,7 +325,7 @@ private dayHome() {
   }
     
   logger('trace','dayHomeRoute',"${msg}")
-  notify(state.logHandle,"(${name}) ${msg}")
+  notify(state.appTitle,"(${name}) ${msg}")
 }
 
 private dayAway() {
@@ -373,14 +378,14 @@ private static double round(double value, int precision) {
   return (double) Math.round(value*scale)/scale
 }
 
-private logger(type,loc,msg) {
-  if ("${type}" == 'info') {
-    log."${type}" "[[${state.logHandle}]] [${loc}]: ${msg}"
+private logger(level,loc,msg) {
+  if (state.logMode > 0 && "${level}" == 'info') {
+    log."${level}" "[[${state.logHandle}]] [${loc}]: ${msg}"
   }
-  else if (state.logMode > 0 && "${type}" == 'trace') {
-    log."${type}" "[[${state.logHandle}]] [${loc}]: ${msg}"
+  else if (state.logMode > 1 && "${level}" == 'trace') {
+    log."${level}" "[[${state.logHandle}]] [${loc}]: ${msg}"
   }
-  else if (state.logMode > 1) {
-    log."${type}" "[[${state.logHandle}]] [${loc}]: ${msg}"
+  else if (state.logMode > 2) {
+    log."${level}" "[[${state.logHandle}]] [${loc}]: ${msg}"
   }
 }
