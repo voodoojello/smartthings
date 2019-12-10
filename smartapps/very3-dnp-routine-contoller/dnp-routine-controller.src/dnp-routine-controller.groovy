@@ -150,7 +150,7 @@ def updated() {
 }
 
 def initialize() {
-  state.logMode   = 3 // [0 = off, 1 = info, 2 = info/trace, 3 = anything]
+  state.logMode   = 0 // [0 = off, 1 = info, 2 = info/trace, 3 = anything]
   state.logHandle = 'DNPRC'
   state.appTitle  = 'DNP Routine Controller'
 
@@ -189,14 +189,61 @@ def router() {
   logger('info','router',"Router event fired...")
   
   if (appEnable == false) {
-    logger('info','router',"Presence Monitor disabled. No action taken.")
+    notify(state.appTitle,"DNP disabled. No action taken.")
+    logger('info','router',"DNP disabled. No action taken.")
     return
   }
 
+  int homeCheck  = presenceCheck()
+  int lumenCheck = illuminanceCheck()
+  def hasChange  = false
+
+  // Determine state changes
+  if (state.isHome != state.wasHome) {
+    state.wasHome = state.isHome
+    hasChange = true
+    logger('debug','homeChange',"${state.wasHome} => ${state.isHome}")
+  }
+  if (state.isNight != state.wasNight) {
+    state.wasNight = state.isNight
+    if (enableLightRoutineChanges) {
+      hasChange = true
+    }
+    logger('debug','nightChange',"${state.wasNight} => ${state.isNight}, enableLightRoutineChanges: ${enableLightRoutineChanges}")
+  }
+
+  msg.push("homeCheck: ${homeCheck}, lumenCheck: ${lumenCheck}, hasChange: ${hasChange}, [state.isHome: ${state.isHome}, state.illuminanceStatus: ${state.illuminanceStatus}, state.isNight: ${state.isNight}, state.presenceStatus: ${state.presenceStatus}]")
+  logger('info','router',"${msg}")
+
+  // Route on change
+  if (hasChange) {
+    if (state.isNight == true && state.isHome == true) {
+      notify(state.appTitle,"Detected state change (Night/Home), starting run...")
+      unschedule() // Clear pending schedules on return. Awkward.
+      nightHome()
+    }
+    if (state.isNight == true && state.isHome == false) {
+      notify(state.appTitle,"Detected state change (Night/Away), starting run...")
+      nightAway()
+    }
+    if (state.isNight == false && state.isHome == true) {
+      notify(state.appTitle,"Detected state change (Day/Home), starting run...")
+      unschedule() // Clear pending schedules on return. Awkward.
+      dayHome()
+    }
+    if (state.isNight == false && state.isHome == false) {
+      notify(state.appTitle,"Detected state change (Day/Away), starting run...")
+      dayAway()
+    }
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+private presenceCheck() {
   int homeCheck = 0
-  def hasChange = false
-  
-  // Presence check
+  state.isHome  = false
+
   state.presenceStatus.each {
     if (it == 'present') {
       homeCheck = homeCheck + 1
@@ -215,56 +262,19 @@ def router() {
   if (homeCheck > 0) {
     state.isHome = true
   }
-  else {
-    state.isHome = false
-  }
+  
+  return homeCheck
+}
 
-  // Illuminance check
+private illuminanceCheck() {
+  state.isNight   = false
+  int illuminance = illuminanceSource.latestValue("illuminance")
+  
   if ((illuminanceSource.latestValue("illuminance") - lightThreshold) < lightTolerance) {
     state.isNight = true
   }
-  else {
-    state.isNight = false
-  }
-
-  // Detect state changes
-  if (state.isHome != state.wasHome) {
-    state.wasHome = state.isHome
-    hasChange = true
-    logger('debug','homeChange',"${state.wasHome} => ${state.isHome}")
-  }
-  if (state.isNight != state.wasNight) {
-    state.wasNight = state.isNight
-    if (enableLightRoutineChanges) {
-      hasChange = true
-    }
-    logger('debug','nightChange',"${state.wasNight} => ${state.isNight}, enableLightRoutineChanges: (${enableLightRoutineChanges}")
-  }
-
-  msg.push("homeCheck: ${homeCheck}, hasChange: ${hasChange}, [state.isHome: ${state.isHome}, state.illuminanceStatus: ${state.illuminanceStatus}, state.isNight: ${state.isNight}, state.presenceStatus: ${state.presenceStatus}]")
-  logger('info','router',"${msg}")
-
-  // Route only on change
-  if (hasChange) {
-    if (state.isNight == true && state.isHome == true) {
-      notify(state.appTitle,"Detected state change (Night/Home), starting run...")
-      unschedule() // Clear pending schedules on return
-      nightHome()
-    }
-    if (state.isNight == true && state.isHome == false) {
-      notify(state.appTitle,"Detected state change (Night/Away), starting run...")
-      nightAway()
-    }
-    if (state.isNight == false && state.isHome == true) {
-      notify(state.appTitle,"Detected state change (Day/Home), starting run...")
-      unschedule() // Clear pending schedules on return
-      dayHome()
-    }
-    if (state.isNight == false && state.isHome == false) {
-      notify(state.appTitle,"Detected state change (Day/Away), starting run...")
-      dayAway()
-    }
-  }
+  
+  return illuminance
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
