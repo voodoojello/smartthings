@@ -2,10 +2,10 @@
 //
 //  Day/Night/Presence (DNP) Routine Controller for SmartThings
 //  Copyright (c)2019-2020 Mark Page (mark@very3.net)
-//  Modified: Tue Dec 10 05:06:29 CST 2019
+//  Modified: Tue Dec 10 18:05:33 CST 2019
 //
-//  The Day/Night/Presence (DNP) Routine Controller for SmartThings allows conditional firing of multiple routines 
-//  based on changes to presence and daylight (illumination). Secondary multiple routines can be fired after a set 
+//  The Day/Night/Presence (DNP) Routine Controller for SmartThings allows conditional firing of multiple routines
+//  based on changes to presence and daylight (illumination). Secondary multiple routines can be fired after a set
 //  interval.
 //
 //  This SmartApp requires a illuminanceMeasurement capable device such as the Aeotec TriSensor (Z-Wave Plus S2) or
@@ -28,8 +28,8 @@
 definition (
   name: "DNP Routine Controller",
   namespace: "very3-dnp-routine-contoller",
-  released: "Tue Dec 10 05:06:29 CST 2019",
-  version: "19.12.10.5",
+  released: "Tue Dec 10 18:05:33 CST 2019",
+  version: "19.12.10.18",
   author: "Mark Page",
   description: "The Day/Night/Presence (DNP) Routine Controller for SmartThings allows conditional firing of multiple routines based on changes to presence and/or daylight (illumination). Secondary multiple routines can be fired after a set interval.",
   singleInstance: true,
@@ -38,6 +38,8 @@ definition (
   iconX2Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png",
   iconX3Url: "https://raw.githubusercontent.com/voodoojello/smartthings/master/very3-512px.png"
 )
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 preferences {
   page(name: "mainPage", title: "DNP Contoller General Settings", nextPage: "daySettings", uninstall: true) {
@@ -70,22 +72,29 @@ preferences {
 
     section("Notify on Change") {
       paragraph("Send notifications when the DNP Routine Controller makes changes")
-      paragraph("Push and SMS notifications can be somewhat overwhelming depending on the number of routines selected.", title: "Heads Up!", required: true, image: "http://cdn.device-icons.smartthings.com/Lighting/light11-icn@2x.png")
+      paragraph("Push and SMS messages can be somewhat verbose depending on the number of routines selected.", title: "Heads Up!", required: true, image: "http://cdn.device-icons.smartthings.com/Lighting/light11-icn@2x.png")
       input("appNotify", "bool", title: "Notify everyone in \"Hello Home\"", defaultValue: true)
-      input("devNotify", "bool", title: "Notify everyone via push notification", defaultValue: false)
+      input("devNotify", "bool", title: "Notify everyone via push", defaultValue: false)
       input("smsNotify", "bool", title: "Notify only me via SMS", defaultValue: false)
       input("smsNumber", "phone", title: "Phone number for SMS messages", hideWhenEmpty: "smsNotify", required: false)
     }
     
-    section ("Enable/Disable (bypass) DNP Routine Controller") {
-      paragraph ("Enable/Disable (bypass) the DNP Controller to prevent presence changes. Handy if you're leaving non-presence guests (like babysitters) at home alone.")
+    section("Enable/Disable (bypass) DNP Routine Controller") {
+      paragraph("Enable/Disable (bypass) the DNP Controller to prevent presence changes. Handy if you're leaving non-presence guests (like babysitters) at home alone.")
       input("appEnable", "bool", title: "Enable Presence Monitor", defaultValue: true)
+    }
+    
+    section(hideable: true, hidden: true, "Developer Options"){
+      paragraph("Logging level shown in SmartThings IDE (0 = off, 1 = info, 2 = info/trace, 3 = anything)")
+      input("ideLogLevel", "number", title: "Logging Level")
     }
   }
   
   page(name: "daySettings", title: "Day Settings", nextPage: "nightSettings")
   page(name: "nightSettings", title: "Night Settings", install: true)
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def daySettings() {
   def actions = location.helloHome?.getPhrases()*.label
@@ -111,6 +120,8 @@ def daySettings() {
   }
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 def nightSettings() {
   def actions = location.helloHome?.getPhrases()*.label
   actions.sort()
@@ -135,7 +146,6 @@ def nightSettings() {
   }
 }
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def installed() {
@@ -150,13 +160,14 @@ def updated() {
 }
 
 def initialize() {
-  state.logMode   = 0 // [0 = off, 1 = info, 2 = info/trace, 3 = anything]
+  state.logMode   = ideLogLevel
   state.logHandle = 'DNPRC'
   state.appTitle  = 'DNP Routine Controller'
 
-  state.isHome    = null
+  state.trigger   = 'initialize'
+  state.isHome    = presenceCheck().isHome
+  state.isNight   = illuminanceCheck().isNight
   state.wasHome   = null
-  state.isNight   = null
   state.wasNight  = null
   
   state.presenceStatus    = userPresenceList.latestValue("presence")
@@ -168,14 +179,12 @@ def initialize() {
   router()
 }
 
-// Presence event handler
 def presenceHandler(evt) {
   logger('info','presenceHandler',"Presence ${evt.name} changed to ${evt.value}")
   state.presenceStatus = evt.value
   router()
 }
 
-// Illuminance event handler
 def illuminanceHandler(evt) {
   logger('info','illuminanceHandler',"Illuminance ${evt.name} changed to ${evt.value}")
   state.illuminanceStatus = evt.value
@@ -185,7 +194,6 @@ def illuminanceHandler(evt) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def router() {
-  def msg = []
   logger('info','router',"Router event fired...")
   
   if (appEnable == false) {
@@ -194,210 +202,158 @@ def router() {
     return
   }
 
-  int homeCheck  = presenceCheck()
-  int lumenCheck = illuminanceCheck()
-  def hasChange  = false
+  def msg = []
+  
+  def presence    = presenceCheck()
+  def illuminance = illuminanceCheck()
+  
+  int homeCheck   = presence.homeCheck
+  int lumenCheck  = illuminance.lumenCheck
+  def hasChange   = false
 
-  // Determine state changes
+  state.isHome    = presence.isHome
+  state.isNight   = illuminance.isNight
+
   if (state.isHome != state.wasHome) {
     state.wasHome = state.isHome
+    state.trigger = 'Presence'
     hasChange = true
-    logger('debug','homeChange',"${state.wasHome} => ${state.isHome}")
+    logger('debug','presenceChange',"${state.wasHome} => ${state.isHome}")
   }
+  
   if (state.isNight != state.wasNight) {
     state.wasNight = state.isNight
     if (enableLightRoutineChanges) {
+      state.trigger  = 'Illuminance'
       hasChange = true
     }
-    logger('debug','nightChange',"${state.wasNight} => ${state.isNight}, enableLightRoutineChanges: ${enableLightRoutineChanges}")
+    logger('debug','illuminanceChange',"${state.wasNight} => ${state.isNight}, enableLightRoutineChanges: ${enableLightRoutineChanges}")
   }
 
-  msg.push("homeCheck: ${homeCheck}, lumenCheck: ${lumenCheck}, hasChange: ${hasChange}, [state.isHome: ${state.isHome}, state.illuminanceStatus: ${state.illuminanceStatus}, state.isNight: ${state.isNight}, state.presenceStatus: ${state.presenceStatus}]")
+  msg.push("presence: ${presence}, illuminance: ${illuminance}, homeCheck: ${homeCheck}, lumenCheck: ${lumenCheck}, hasChange: ${hasChange}, [state.isHome: ${state.isHome}, state.illuminanceStatus: ${state.illuminanceStatus}, state.isNight: ${state.isNight}, state.presenceStatus: ${state.presenceStatus}, state.logMode: ${state.logMode}]")
   logger('info','router',"${msg}")
 
-  // Route on change
   if (hasChange) {
     if (state.isNight == true && state.isHome == true) {
-      notify(state.appTitle,"Detected state change (Night/Home), starting run...")
-      unschedule() // Clear pending schedules on return. Awkward.
-      nightHome()
+      def changedTo = 'Night/Home'
+      unschedule(delayedScheduleHandler)
+      routineHandler(changedTo,illuminanceLowHomeRoutine,illuminanceLowHomeDelayedRoutine,illuminanceLowDelay)
     }
+    
     if (state.isNight == true && state.isHome == false) {
-      notify(state.appTitle,"Detected state change (Night/Away), starting run...")
-      nightAway()
+      def changedTo = 'Night/Away'
+      routineHandler(changedTo,illuminanceLowAwayRoutine,illuminanceLowAwayDelayedRoutine,illuminanceLowDelay)
     }
+    
     if (state.isNight == false && state.isHome == true) {
-      notify(state.appTitle,"Detected state change (Day/Home), starting run...")
-      unschedule() // Clear pending schedules on return. Awkward.
-      dayHome()
+      def changedTo = 'Day/Home'
+      unschedule(delayedScheduleHandler)
+      routineHandler(changedTo,illuminanceHighHomeRoutine,illuminanceHighHomeDelayedRoutine,illuminanceHighDelay)
     }
+    
     if (state.isNight == false && state.isHome == false) {
-      notify(state.appTitle,"Detected state change (Day/Away), starting run...")
-      dayAway()
+      def changedTo = 'Day/Away'
+      routineHandler(changedTo,illuminanceHighAwayRoutine,illuminanceHighAwayDelayedRoutine,illuminanceHighDelay)
     }
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+private routineHandler(changedTo,routines,delayedRoutines,delay) {
+  def msg   = []
+
+  msg.push("State changed to: ${changedTo}")
+  msg.push("Changed by: ${state.trigger}")
+  
+  if (routines != null) {
+    routines.each {
+      location.helloHome?.execute("${it}")
+      msg.push("Ran Routine: ${it}")
+    }
+  }
+
+  if (delayedRoutines != null) {
+    int runInSecs = (delay * 60)
+    runIn(runInSecs, "delayedScheduleHandler", [data: [routines: delayedRoutines, source: "${changedTo} Delayed"]])
+    msg.push("Queued Routine(s): ${delayedRoutines} (delayed ${delay} minutes)")
+  }
+
+  logger('debug','routineHandler',"${msg}")
+  notify(state.appTitle,msg.join("\n"))
+}
+
+def delayedScheduleHandler(data) {
+  def msg = []
+  
+  if (data.routines != null) {
+    data.routines.each {
+      location.helloHome?.execute("${it}")
+      logger('debug','delayedScheduleHandler',"Ran Delayed Routine: ${it}")
+      msg.push("Ran Delayed Routine: ${it}")
+    }
+    
+   notify(state.appTitle,msg.join("\n"))
   }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 private presenceCheck() {
-  int homeCheck = 0
-  state.isHome  = false
+  def retort = [:]
+
+  retort['isHome']    = false
+  retort['homeCheck'] = 0
 
   state.presenceStatus.each {
     if (it == 'present') {
-      homeCheck = homeCheck + 1
+      retort['homeCheck'] = retort['homeCheck'] + 1
     }
   }
   userPresenceList.latestValue("presence").each {
     if (it == 'present') {
-      homeCheck = homeCheck + 1
+      retort['homeCheck'] = retort['homeCheck'] + 1
     }
   }
   userPresenceList.currentValue("presence").each {
     if (it == 'present') {
-      homeCheck = homeCheck + 1
+      retort['homeCheck'] = retort['homeCheck'] + 1
     }
   }
-  if (homeCheck > 0) {
-    state.isHome = true
+  
+  if (retort['homeCheck'] > 0) {
+    retort['isHome'] = true
   }
   
-  return homeCheck
+  return retort
 }
 
 private illuminanceCheck() {
-  state.isNight   = false
-  int illuminance = illuminanceSource.latestValue("illuminance")
+  def retort = [:]
+  
+  retort['lumenCheck'] = illuminanceSource.latestValue("illuminance")
+  retort['isNight']    = false
   
   if ((illuminanceSource.latestValue("illuminance") - lightThreshold) < lightTolerance) {
-    state.isNight = true
+    retort['isNight'] = true
   }
   
-  return illuminance
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-private nightHome() {
-  def msg   = []
-  def name  = 'Night Home'
-  int count = 0
-  
-  if (illuminanceLowHomeRoutine != null) {
-    illuminanceLowHomeRoutine.each {
-      location.helloHome?.execute("${it}")
-      msg.push("Ran Routine: ${it}")
-    }
-  }
-    
-  if (illuminanceLowHomeDelayedRoutine != null) {
-    illuminanceLowHomeDelayedRoutine.each {
-      int runInSecs = (illuminanceLowDelay * 60) + count
-      runIn(runInSecs, "delayRunner", [overwrite: false, data: [routine: it, source: "${name} Delayed"]])
-      msg.push("Queued Routine: ${it} (delayed ${illuminanceLowDelay} minutes)")
-      count = count + 1
-    }
-  }
-      
-  logger('trace','nightHomeRoute',"${msg}")
-  notify(state.appTitle,"(${name}) ${msg}")
-}
-
-private nightAway() {
-  def msg   = []
-  def name  = 'Night Away'
-  int count = 0
-
-  if (illuminanceLowAwayRoutine != null) {
-    illuminanceLowAwayRoutine.each {
-      location.helloHome?.execute("${it}")
-      msg.push("Ran Routine: ${it}")
-    }
-  }
-  
-  if (illuminanceLowAwayDelayedRoutine != null) {
-    illuminanceLowAwayDelayedRoutine.each {
-      int runInSecs = (illuminanceLowDelay * 60) + count
-      runIn(runInSecs, "delayRunner", [overwrite: false, data: [routine: it, source: "${name} Delayed"]])
-      msg.push("Queued Routine: ${it} (delayed ${illuminanceLowDelay} minutes)")
-      count = count + 1
-    }
-  }
-
-  logger('trace','nightAwayRoute',"${msg}")
-  notify(state.appTitle,"(${name}) ${msg}")
-}
-
-private dayHome() {
-  def msg   = []
-  def name  = 'Day Home'
-  int count = 0
-
-  if (illuminanceHighHomeRoutine != null) {
-    illuminanceHighHomeRoutine.each {
-      location.helloHome?.execute("${it}")
-      msg.push("Ran Routine: ${it}")
-    }
-  }
-
-  if (illuminanceHighHomeDelayedRoutine != null) {
-    illuminanceHighHomeDelayedRoutine.each {
-      int runInSecs = (illuminanceHighDelay * 60) + count
-      runIn(runInSecs, "delayRunner", [overwrite: false, data: [routine: it, source: "${name} Delayed"]])
-      msg.push("Queued Routine: ${it} (delayed ${illuminanceHighDelay} minutes)")
-      count = count + 1
-    }
-  }
-    
-  logger('trace','dayHomeRoute',"${msg}")
-  notify(state.appTitle,"(${name}) ${msg}")
-}
-
-private dayAway() {
-  def msg   = []
-  def name  = 'Day Away'
-  int count = 0
-
-  if (illuminanceHighAwayRoutine != null) {
-    illuminanceHighAwayRoutine.each {
-      location.helloHome?.execute("${it}")
-      msg.push("Ran Routine: ${it}")
-    }
-  }
-
-  if (illuminanceHighAwayDelayedRoutine != null) {
-    illuminanceHighAwayDelayedRoutine.each {
-      int runInSecs = (illuminanceHighDelay * 60) + count
-      runIn(runInSecs, "delayRunner", [overwrite: false, data: [routine: it, source: "${name} Delayed"]])
-      msg.push("Queued Routine: ${it} (delayed ${illuminanceHighDelay} minutes)")
-      count = count + 1
-    }
-  }
-    
-  logger('trace','dayAwayRoute',"${msg}")
-  notify(state.appTitle,"(${name}) ${msg}")
-}
-
-def delayRunner(data) {
-  if (data.routine != null) {
-    location.helloHome?.execute("${data.routine}")
-    logger('debug','delayRunner',"Ran Delayed Routine: ${data.routine}")
-    notify(state.appTitle,"(${data.source}) Ran Delayed Routine: ${data.routine}")
-  }
+  return retort
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 private notify(title,msg) {
-  def msgStr = "[${title}]: ${msg}"
+  def msgStr = "[${title}]\n${msg}"
   
   if (appNotify) {
     sendNotificationEvent(msgStr)
   }
+  
   if (devNotify) {
     sendPush(msgStr)
   }
+  
   if (smsNotify && smsNumber) {
     sendSms(smsNumber,msgStr)
   }
@@ -416,3 +372,5 @@ private logger(level,loc,msg) {
     log."${level}" "${msgStr}"
   }
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
