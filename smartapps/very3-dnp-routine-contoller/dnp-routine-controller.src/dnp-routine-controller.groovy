@@ -2,7 +2,7 @@
 //
 //  Day/Night/Presence (DNP) Routine Controller for SmartThings
 //  Copyright (c)2019-2020 Mark Page (mark@very3.net)
-//  Modified: Tue Dec 10 18:05:33 CST 2019
+//  Modified: Wed Dec 11 05:42:47 CST 2019
 //
 //  The Day/Night/Presence (DNP) Routine Controller for SmartThings allows conditional firing of multiple routines
 //  based on changes to presence and daylight (illumination). Secondary multiple routines can be fired after a set
@@ -28,8 +28,8 @@
 definition (
   name: "DNP Routine Controller",
   namespace: "very3-dnp-routine-contoller",
-  released: "Tue Dec 10 18:05:33 CST 2019",
-  version: "19.12.10.18",
+  released: "Wed Dec 11 05:42:47 CST 2019",
+  version: "19.12.11.5",
   author: "Mark Page",
   description: "The Day/Night/Presence (DNP) Routine Controller for SmartThings allows conditional firing of multiple routines based on changes to presence and/or daylight (illumination). Secondary multiple routines can be fired after a set interval.",
   singleInstance: true,
@@ -72,7 +72,7 @@ preferences {
 
     section("Notify on Change") {
       paragraph("Send notifications when the DNP Routine Controller makes changes")
-      paragraph("Push and SMS messages can be somewhat verbose depending on the number of routines selected.", title: "Heads Up!", required: true, image: "http://cdn.device-icons.smartthings.com/Lighting/light11-icn@2x.png")
+      paragraph("Push and SMS messages can be somewhat verbose depending on the number of routines selected, espcially if your routines are sending notifications as well.", title: "Heads Up!", required: true, image: "http://cdn.device-icons.smartthings.com/Lighting/light11-icn@2x.png")
       input("appNotify", "bool", title: "Notify everyone in \"Hello Home\"", defaultValue: true)
       input("devNotify", "bool", title: "Notify everyone via push", defaultValue: false)
       input("smsNotify", "bool", title: "Notify only me via SMS", defaultValue: false)
@@ -109,8 +109,8 @@ def daySettings() {
     
     section("Day Presence Change Delayed Routines") {
       paragraph("Routines to run after delay when presence mode changes during the day (above low light threshold).")
-      input ("illuminanceHighAwayDelayedRoutine", "enum", title: "Delayed routines to run when it's day, after everyone has left:", options: actions, multiple: true, required: false)
-      input ("illuminanceHighHomeDelayedRoutine", "enum", title: "Delayed routines to run when it's day, after anyone is home:", options: actions, multiple: true, required: false)
+      input ("illuminanceHighAwayDelayedRoutine", "enum", title: "Delayed routines to run when it's day and everyone leaves:", options: actions, multiple: true, required: false)
+      input ("illuminanceHighHomeDelayedRoutine", "enum", title: "Delayed routines to run when it's day and anyone is home:", options: actions, multiple: true, required: false)
     }
     
     section("Day Presence Change Wait Interval") {
@@ -135,8 +135,8 @@ def nightSettings() {
     
     section("Night Presence Change Delayed Routines") {
       paragraph("Routines to run after delay when presence mode changes at night (below low light threshold).")
-      input ("illuminanceLowAwayDelayedRoutine", "enum", title: "Delayed routines to run when it's night, after everyone has left:", options: actions, multiple: true, required: false)
-      input ("illuminanceLowHomeDelayedRoutine", "enum", title: "Delayed routines to run when it's night, after anyone is home:", options: actions, multiple: true, required: false)
+      input ("illuminanceLowAwayDelayedRoutine", "enum", title: "Delayed routines to run when it's night and everyone leaves:", options: actions, multiple: true, required: false)
+      input ("illuminanceLowHomeDelayedRoutine", "enum", title: "Delayed routines to run when it's night and anyone is home:", options: actions, multiple: true, required: false)
     }
 
     section("Night Presence Change Wait Interval") {
@@ -263,8 +263,7 @@ def router() {
 private routineHandler(changedTo,routines,delayedRoutines,delay) {
   def msg   = []
 
-  msg.push("State changed to: ${changedTo}")
-  msg.push("Changed by: ${state.trigger}")
+  notify(state.appTitle,"State changed to: ${changedTo}\nChanged by: ${state.trigger}\nLaunching routines...")
   
   if (routines != null) {
     routines.each {
@@ -300,45 +299,45 @@ def delayedScheduleHandler(data) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 private presenceCheck() {
-  def retort = [:]
+  def reply = [:]
 
-  retort['isHome']    = false
-  retort['homeCheck'] = 0
+  reply['isHome']    = false
+  reply['homeCheck'] = 0
 
   state.presenceStatus.each {
     if (it == 'present') {
-      retort['homeCheck'] = retort['homeCheck'] + 1
+      reply['homeCheck'] = reply['homeCheck'] + 1
     }
   }
   userPresenceList.latestValue("presence").each {
     if (it == 'present') {
-      retort['homeCheck'] = retort['homeCheck'] + 1
+      reply['homeCheck'] = reply['homeCheck'] + 1
     }
   }
   userPresenceList.currentValue("presence").each {
     if (it == 'present') {
-      retort['homeCheck'] = retort['homeCheck'] + 1
+      reply['homeCheck'] = reply['homeCheck'] + 1
     }
   }
   
-  if (retort['homeCheck'] > 0) {
-    retort['isHome'] = true
+  if (reply['homeCheck'] > 0) {
+    reply['isHome'] = true
   }
   
-  return retort
+  return reply
 }
 
 private illuminanceCheck() {
-  def retort = [:]
+  def reply = [:]
   
-  retort['lumenCheck'] = illuminanceSource.latestValue("illuminance")
-  retort['isNight']    = false
+  reply['lumenCheck'] = illuminanceSource.latestValue("illuminance")
+  reply['isNight']    = false
   
   if ((illuminanceSource.latestValue("illuminance") - lightThreshold) < lightTolerance) {
-    retort['isNight'] = true
+    reply['isNight'] = true
   }
   
-  return retort
+  return reply
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
