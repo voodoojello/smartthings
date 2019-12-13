@@ -69,7 +69,7 @@ metadata {
     section {
       input name: "lanDevIPAddr", type: "text", title: "LAN PWS JSON Source IP Address", description: "IP Address of the PWS JSON source", required: true, displayDuringSetup: true
       input name: "lanDevIPPort", type: "number", title: "LAN PWS JSON Source IP Port", description: "Port of the PWS JSON source",  defaultValue: "80", displayDuringSetup: true
-      input name: "runInSecs", type: "number", title: "PWS Polling Frequency", description: "Polling PWS Every XXX Seconds",  defaultValue: "360", displayDuringSetup: true
+      //input name: "runInSecs", type: "number", title: "PWS Polling Frequency", description: "Polling PWS Every XXX Seconds",  defaultValue: "360", displayDuringSetup: true
     }
   }
 
@@ -153,12 +153,12 @@ def initialize() {
   logger('info','initialize',"Logging set to ${state.logMode}")
 
   poll()
+  runEvery1Minute(poll)
 }
 
 def poll() {
   logger('info','poll',"Starting polling cycle (${runInSecs}s intervals)")
   fetchJSON()
-  runIn(runInSecs, poll)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

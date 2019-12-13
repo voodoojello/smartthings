@@ -70,9 +70,6 @@ metadata {
       input name: "switchMode", type: "enum", title: "Default Switch Mode", description: "Standard or Toggle Mode", options: ["Standard","Toggle"], required: true, displayDuringSetup: true
       input name: "toggleTime", type: "number", title: "Toggle Time (secs)", description: "Toggle time in seconds (for toggle mode)", defaultValue: "60" ,displayDuringSetup: true
     }
-    section {
-      input name: "runInSecs", type: "number", title: "Polling Frequency (secs)", description: "Polling Frequency in seconds", defaultValue: "60" ,displayDuringSetup: true
-    }
   }
 
   tiles (scale: 2) {
@@ -134,12 +131,13 @@ def initialize() {
   logger('info','initialize',"Setting time to ${unixEpoch}")
   
   sendEvent(name: "checkInterval", value: 60, displayed: false, data: [protocol: "lan", hubHardwareId: device.hub.hardwareID, offlinePingable: "1"])
+  
   poll()
+  runEvery1Minute(poll)
 }
 
 def poll() {
   logger('info','poll',"Starting polling cycle (${runInSecs}s frequency)")
-  runIn(runInSecs, poll)
   sendCmnd("Status 0")
 }
 
