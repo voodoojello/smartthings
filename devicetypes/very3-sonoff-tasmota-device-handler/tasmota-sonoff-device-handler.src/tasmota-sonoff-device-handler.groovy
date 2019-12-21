@@ -2,9 +2,9 @@
 //
 //  Tasmota-Sonoff Device Handler for SmartThings
 //  Copyright (c)2019-2020 Mark Page (mark@very3.net)
-//  Modified: Sat Nov 30 07:01:26 CST 2019
+//  Modified: Sat Dec 21 05:51:01 CST 2019
 //
-//  This device handler is for ESP8266 based Sonoff Basic devices running Tasmota 6.6.0 or higher.
+//  This device handler is for ESP8266 based Sonoff Basic/POW devices running Tasmota 6.6.0 or higher.
 //  In theory this *should* work with any single-relay ESP8266 device running Tasmota but YMMV.
 //  Devices can act as standard on/off switches or as "toggles" (on/off/on, off/on/off) with preset
 //  timers. The toggles are handy for rebooting routers, DOCSIS modems, or even the ST hub =)
@@ -13,6 +13,10 @@
 //
 //      BASICR2 Wi-Fi DIY Smart Switch
 //      https://sonoff.tech/product/wifi-diy-smart-switches/basicr2
+//      Note: The BASICR2 does *not* support power monitoring.
+//
+//      POWR2 Smart Switch
+//      https://sonoff.tech/product/wifi-diy-smart-switches/powr2
 //
 //      Tasmota: Alternative firmware for ESP8266 based devices
 //      https://github.com/arendst/Tasmota
@@ -90,10 +94,16 @@ metadata {
     standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 3, height: 2) {
       state "default", label:"Refresh", action:"refresh.refresh", icon:"st.secondary.refresh"
     }
- }
+    valueTile("current", "device.current", decoration: "flat", width: 3, height: 2) {
+      state "current", label:'Watts: ${currentValue}', icon:"st.Lighting.light14"
+    }
+    valueTile("voltage", "device.voltage", decoration: "flat", width: 3, height: 2) {
+      state "voltage", label:'Volts: ${currentValue}', icon:"st.Entertainment.entertainment15"
+    }
+  }
 
   main(["switch"])
-  details(["switch", "toggle", "refresh"])
+  details(["switch", "toggle", "refresh","current","voltage"])
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,11 +125,11 @@ def updated() {
 }
 
 def refresh() {
-  initialize()
+  poll()
 }
 
 def initialize() {
-  state.logMode     = 0
+  state.logMode     = 3
   state.logHandle   = 'TSDH'
   state.deviceState = ""
   logger('info','initialize',"Logging set to ${state.debugMode}")
@@ -137,7 +147,7 @@ def initialize() {
 }
 
 def poll() {
-  logger('info','poll',"Starting polling cycle (${runInSecs}s frequency)")
+  logger('info','poll',"Starting polling cycle...")
   sendCmnd("Status 0")
 }
 
@@ -188,8 +198,25 @@ def parse(description) {
     if (msg.json != null) {
       if (msg.json.StatusSTS?.Wifi?.RSSI != null && msg.json.StatusNET?.IPAddress != null) {
         sendEvent(name: "wifi_info", value: msg.json.StatusSTS.Wifi.SSId+' (-'+msg.json.StatusSTS.Wifi.RSSI+"dB)\n"+msg.json.StatusNET.IPAddress+"\n")
+		logger('debug','wifi_info',"SSId: ${msg.json.StatusSTS.Wifi.SSId}, RSSI: ${msg.json.StatusSTS.Wifi.RSSI}")
       }
-      
+
+      if (msg.json.StatusSNS?.ENERGY?.Current != null) {
+        sendEvent(name: "current", value: msg.json.StatusSNS.ENERGY.Current)
+		logger('debug','current',"Current: ${msg.json.StatusSNS.ENERGY.Current}")
+      }
+      else {
+        sendEvent(name: "current", value: '0.00')
+      }
+
+      if (msg.json.StatusSNS?.ENERGY?.Voltage != null) {
+        sendEvent(name: "voltage", value: msg.json.StatusSNS.ENERGY.Voltage)
+		logger('debug','voltage',"Voltage: ${msg.json.StatusSNS.ENERGY.Voltage}")
+      }
+      else {
+        sendEvent(name: "voltage", value: '0.00')
+      }
+
       if (msg.json.POWER != null) {
         if (msg.json.POWER == 'ON') {
           state.deviceState = 'on'
@@ -267,11 +294,15 @@ def off() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 private logger(level,loc,msg) {
-  // type: error, warn, info, debug, trace
-  if ("${level}" == 'info') {
-    log."${level}" "${state.logHandle} [${loc}]: ${msg}"
+  def msgStr = "[[${state.logHandle}]] [${loc}]: ${msg}"
+  
+  if (state.logMode > 0 && "${level}" == 'info') {
+    log."${level}" "${msgStr}"
   }
-  else if (state.logMode > 0) {
-    log."${level}" "${state.logHandle} [${loc}]: ${msg}"
+  else if (state.logMode > 1 && "${level}" == 'trace') {
+    log."${level}" "${msgStr}"
+  }
+  else if (state.logMode > 2) {
+    log."${level}" "${msgStr}"
   }
 }
