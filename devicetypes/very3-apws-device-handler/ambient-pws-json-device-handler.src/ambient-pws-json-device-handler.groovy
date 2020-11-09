@@ -119,7 +119,7 @@ metadata {
       state "val", label:'${currentValue}', action:"refresh.refresh", icon:"st.Health & Wellness.health7"
     }
 
-    main(["temperature"])
+    main("temperature")
     details(["temperature","uv_composite","humidity_composite","pressure_composite","wind_composite","rain_composite","cloud_composite","updated","refresh"])
   }
 }
